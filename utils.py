@@ -1,0 +1,462 @@
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage, SystemMessage
+import chardet
+import sys
+import json
+import locale
+import os
+import requests
+import subprocess
+import re
+import shutil
+
+from diff import apply_patch
+from log_writer import logger
+import config
+
+
+def _create_client(provider: str, api_key: str, base_url: str, model_name: str):
+    provider = provider.lower()
+    if provider == "anthropic":
+        return ChatAnthropic(api_key=api_key, model_name=model_name, max_tokens=10000)
+    if provider == "google":
+        return ChatGoogleGenerativeAI(
+            google_api_key=api_key,
+            model=model_name,
+            max_output_tokens=10000,
+        )
+    return ChatOpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        model_name=model_name,
+        max_tokens=10000,
+        default_headers={
+            "HTTP-Referer": "https://cynia.dev",
+            "X-Title": "CyniaAI",
+        },
+    )
+
+
+def initialize() -> None:
+    """
+    Initializes the software.
+
+    This function logs the software launch, including the version number and platform.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
+    try:
+        locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
+    except locale.Error:
+        logger("Locale en_US.UTF-8 not available, using default locale.")
+    logger(f"Launch. Software version {config.VERSION_NUMBER}, platform {sys.platform}")
+
+
+def askgpt(
+        system_prompt: str,
+        user_prompt: str,
+        model_name: str
+    ) -> str:
+    """
+    Interacts with the LLM using the specified prompts.
+
+    Args:
+        system_prompt (str): The system prompt.
+        user_prompt (str): The user prompt.
+        model_name (str): The model name to use.
+
+    Returns:
+        str: The response from the LLM.
+    """
+    provider = getattr(config, "LLM_PROVIDER", "openai")
+    api_key = config.API_KEY
+    base_url = config.BASE_URL
+
+    client = _create_client(provider, api_key, base_url, model_name)
+
+    logger(f"Initialized the {provider} LLM client.")
+
+    # Define the messages for the conversation
+    if config.GENERATION_MODEL == "o1-preview" or config.GENERATION_MODEL == "o1-mini":
+        messages = [
+            HumanMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
+        ]
+    else:
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
+        ]
+
+    logger(f"askgpt: system {system_prompt}")
+    logger(f"askgpt: user {user_prompt}")
+
+    # Create a chat completion
+    try:
+        response = client.invoke(messages)
+    except Exception as e:
+        logger(f"askgpt: invoke error {e}")
+        if "connect" in str(e).lower():
+            raise Exception(
+                "Failed to connect to your LLM provider. Please check your configuration (make sure the BASE_URL ends with /v1) and internet connection. IT IS NOT A BUG OF BUKKITGPT."
+            )
+        if "api key" in str(e).lower():
+            raise Exception(
+                "Your API key is invalid. Please check your configuration. IT IS NOT A BUG OF BUKKITGPT."
+            )
+        raise
+
+    logger(f"askgpt: response {response}")
+
+    if "Too many requests" in str(response):
+        logger("Too many requests. Please try again later.")
+        raise Exception(
+            "Your LLM provider has rate limited you. Please try again later. IT IS NOT A BUG OF BUKKITGPT."
+        )
+
+    # Extract the assistant's reply
+    try:
+        assistant_reply = response.content
+        logger(f"askgpt: extracted reply {assistant_reply}")
+    except Exception as e:
+        logger(f"askgpt: error extracting reply {e}")
+        raise Exception(
+            "Your LLM didn't return a valid response. Check if the API provider supportes OpenAI response format."
+        )
+
+    return assistant_reply
+
+
+def response_to_action(msg) -> str:
+    """
+    Converts a response from the LLM to an action.
+
+    Args:
+        msg (str): The response from the LLM.
+
+    Returns:
+        str: The action to take.
+    """
+
+    pattern = r"```json(.*?)```"
+    matches = re.findall(pattern, msg, re.DOTALL)
+    if not matches:
+        raise Exception("Invalid response format from LLM. Expected JSON code block.")
+    json_codes = matches[0].strip()
+
+    text = json.loads(json_codes)
+
+    codes = text["codes"]
+
+    for section in codes:
+        file = section["file"]
+        code = section["code"].replace("%linefeed%", "\n")
+
+        paths = file.split("/")
+
+        # Join the list elements to form a path
+        path = os.path.join(*paths)
+
+        # Get the directory path and the file name
+        dir_path, file_name = os.path.split(path)
+
+        # Create directories, if they don't exist
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+        except FileNotFoundError:
+            pass
+
+        # Create the file
+        with open(path, "w") as f:
+            f.write(code)  # Write an empty string to the file
+
+
+def mixed_decode(text: str) -> str:
+    """
+    Decode a mixed text containing both normal text and a byte sequence.
+
+    Args:
+        text (str): The mixed text to be decoded.
+
+    Returns:
+        str: The decoded text, where the byte sequence has been converted to its corresponding characters.
+
+    """
+    # Split the normal text and the byte sequence
+    # Assuming the byte sequence is everything after the last colon and space ": "
+    try:
+        normal_text, byte_text = text.rsplit(": ", 1)
+    except (TypeError, ValueError):
+        # The text only contains normal text
+        return text
+
+    # Convert the byte sequence to actual bytes
+    byte_sequence = byte_text.encode(
+        "latin1"
+    )  # latin1 encoding maps byte values directly to unicode code points
+
+    # Detect the encoding of the byte sequence
+    detected_encoding = chardet.detect(byte_sequence)
+    encoding = detected_encoding["encoding"]
+
+    # Decode the byte sequence
+    decoded_text = byte_sequence.decode(encoding)
+
+    # Combine the normal text with the decoded byte sequence
+    final_text = normal_text + ": " + decoded_text
+    return final_text
+
+def decompile_jar(jar_path: str, output_dir: str) -> bool:
+    """
+    Decompiles a JAR file using the CFR tool.
+
+    Args:
+        jar_path (str): Path to the JAR file to be decompiled.
+        output_dir (str): Directory where the decompiled source code will be saved.
+
+    Returns:
+        bool: True if decompilation is successful, False otherwise.
+    """
+    CFR_JAR_PATH = os.path.join("lib", "cfr-0.152.jar")
+    
+    
+    # Remove the output directory if it already exists
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir)
+    
+    # Run CFR to decompile the JAR file
+    try:
+        print("Starting JAR decompilation...")
+        command = [
+            "java", "-jar", CFR_JAR_PATH, jar_path, "--outputdir", output_dir
+        ]
+        subprocess.run(command, check=True)
+        print(f"Decompilation complete. Source code saved to {output_dir}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Decompilation failed: {e}")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+
+def code_to_text(directory: str) -> str:
+    """
+    Converts the code in a directory to text.
+
+    Args:
+        directory (str): The directory containing the code files.
+
+    Returns:
+        str: The text representation of the code.
+    
+    Return Structure:
+        file1_path:
+        ```
+        1  code
+        2  code
+        ...
+        ```
+        file2_path:
+        Cannot load non-text file
+        ...
+    """
+    def is_text_file(file_path):
+        txt_extensions = [
+            ".txt",
+            ".java",
+            ".py",
+            ".md",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".xml",
+            ".toml",
+            ".ini",
+            ".js",
+            ".groovy",
+            ".log",
+            ".properties",
+            ".cfg",
+            ".conf",
+            ".bat",
+            ".sh",
+            "README",
+        ]
+        return any(file_path.endswith(ext) for ext in txt_extensions)
+
+    text = ""
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            relative_path = os.path.relpath(file_path, directory)
+            
+            if is_text_file(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Add line numbers to content
+                        numbered_lines = [f"{i+1:<3} {line}" for i, line in enumerate(content.splitlines())]
+                        numbered_content = '\n'.join(numbered_lines)
+                        text += f"{relative_path}:\n```\n{numbered_content}\n```\n"
+                except Exception as e:
+                    text += f"{relative_path}: Cannot load non-text file\n"
+            else:
+                text += f"{relative_path}: Cannot load non-text file\n"
+    
+    return text
+    
+
+def parse_edit_response(edit_response: str):
+    """
+    Parses a string containing code diff blocks and extracts the diff content.
+
+    Takes an edit response string containing code diffs formatted in markdown and extracts
+    the content between ```diff and ``` tags.
+
+    Args:
+        edit_response (str): A string containing one or more markdown code diff blocks
+
+    Returns:
+        list[str]: A list of strings containing the extracted diff content, with leading/trailing whitespace removed
+    """
+    pattern = r"```diff(.*?)```"
+    matches = re.findall(pattern, edit_response, re.DOTALL)
+    diffs = [m.strip() for m in matches]
+    return diffs
+
+def apply_diff_changes(diffs: list[str], decomplied_path) -> bool:
+    """
+    Applies the changes specified in a list of diff blocks.
+
+    Args:
+        diffs (list[str]): A list of strings containing diff blocks
+
+    Returns:
+        array(bool, string): 
+            bool: True if the changes were successfully applied, False otherwise
+            string: The message.
+    
+    Example Diff:
+        diff --git a/test.txt b/test.txt
+        --- a/test.txt
+        +++ b/test.txt
+        -strawberry
+        +apple
+        @@ -2,5 +2,5 @@
+    """
+    for diff in diffs:
+        lines = diff.split("\n")
+
+        # Ignore the first line.
+
+        # The second and third lines contain the file paths.
+        original_file = None
+        modified_file = None
+
+        for line in lines:
+            #####################
+            logger(f"Handling pointing line: {line}")
+            if line.startswith("---"):
+                logger(f"Found original file path: {line}")
+                original_file = line.split("---")[-1].strip()
+                # Skip /dev/null paths (indicates new file creation)
+                if "/dev/null" not in original_file:
+                    original_file = original_file.replace(original_file.split("/")[0], decomplied_path, 1)
+                else:
+                    original_file = None
+            elif line.startswith("+++"):
+                logger(f"Found modified file path: {line}")
+                modified_file = line.split("+++")[-1].strip()
+                # Handle /dev/null paths (indicates file deletion)
+                if "/dev/null" not in modified_file:
+                    modified_file = modified_file.replace(modified_file.split("/")[0], decomplied_path, 1)
+                else:
+                    # For file deletion, we don't need to create the modified file
+                    continue
+
+        # Handle different scenarios based on file paths
+        if original_file is None and modified_file is not None:
+            # New file creation (original was /dev/null)
+            logger(f"Creating new file: {modified_file}")
+            # Extract content from diff for new file
+            diff_lines = []
+            in_content = False
+            for line in lines:
+                if line.startswith("@@"):
+                    in_content = True
+                    continue
+                if in_content and (line.startswith("+") and not line.startswith("+++")):
+                    diff_lines.append(line[1:])  # Remove the '+' prefix
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(modified_file), exist_ok=True)
+            
+            # Write new file content
+            with open(modified_file, "w", encoding='utf-8') as file:
+                file.write("\n".join(diff_lines))
+            continue
+            
+        elif original_file is not None and modified_file is None:
+            # File deletion (modified was /dev/null)
+            logger(f"Deleting file: {original_file}")
+            if os.path.exists(original_file):
+                os.remove(original_file)
+            continue
+            
+        elif original_file is None and modified_file is None:
+            return (False, f"Both file paths are /dev/null in diff, which is invalid.\nThe error diff content: {diff}")
+
+        if original_file is None or modified_file is None:
+            return (False, f"One of your diffs is missing the file paths. (eg. --- a/test.txt and +++ b/test.txt).\nThe error diff content: {diff}")
+        
+        # Check if original file exists
+        if not os.path.exists(original_file):
+            return (False, f"Original file does not exist: {original_file}\nThe error diff content: {diff}")
+        
+        # The remaining lines contain the diff.
+        diff_lines = []
+        for i, line in enumerate(lines):
+            if line.startswith("@@"):
+                diff_lines = lines[i:]
+                break
+        
+        if not diff_lines:
+            return (False, f"No diff content found in diff block.\nThe error diff content: {diff}")
+            
+        diff_codes = "\n".join(diff_lines)
+
+        # Apply diff with diff.py
+        try:
+            with open(original_file, "r", encoding='utf-8') as file:
+                original_content = file.read()
+        except Exception as e:
+            return (False, f"Failed to read original file {original_file}: {str(e)}\nThe error diff content: {diff}")
+
+        try:
+            result = apply_patch(original_content, diff_codes)
+        except Exception as e:
+            return (False, f"Failed to apply patch: {str(e)}\nThe error diff content: {diff}")
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(modified_file), exist_ok=True)
+        
+        try:
+            with open(modified_file, "w", encoding='utf-8') as file:
+                file.write(result)
+        except Exception as e:
+            return (False, f"Failed to write modified file {modified_file}: {str(e)}\nThe error diff content: {diff}")
+
+    return (True, "")
+
+
+if __name__ == "__main__":
+    print("This script is not meant to be run directly. Please run console.py instead.")
