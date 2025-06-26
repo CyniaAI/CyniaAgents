@@ -40,3 +40,29 @@ config.register_config_item(
 
 Registered items appear in the **Configuration Center** page where their values can be edited through the UI.
 When using ``input_type='select'`` pass an ``options`` list to define the dropdown choices.
+
+## Interacting with the LLM
+
+Use the :class:`LLM` helper from ``utils`` for any language model requests:
+
+```python
+from utils import LLM
+
+llm = LLM()
+response = llm.ask("You are a helpful assistant.", "Hello")
+```
+
+For multi-turn interactions create a conversation instance and call ``send()``:
+
+```python
+conv = llm.create_conversation("You are a helpful assistant.")
+response = conv.send("Hello")
+```
+The object keeps track of the full history in ``conv.history``.
+You may override provider settings when instantiating the helper:
+
+```python
+llm = LLM(provider="openai", model_name="gpt-4")
+```
+Missing parameters fall back to values defined in `config.py`.
+
