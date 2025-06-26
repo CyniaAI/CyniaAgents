@@ -18,6 +18,9 @@ The repository ships with only a simple example component.  Complex generators s
    The application will create a `.env` file from `.env.example` if it does not exist.
 3. Configure your API keys and choose an LLM provider from the **Configuration Center** page in the sidebar.
 4. Use the **Component Center** to enable or disable installed components.
+   Components may declare additional Python packages they depend on.
+   If a component has missing requirements, an **Install requirements** button
+   will appear on its card to install them with one click.
 
 ## Adding Components
 See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for information on building your own generators.

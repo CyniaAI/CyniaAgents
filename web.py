@@ -67,7 +67,7 @@ def render_component_center():
             </div>
             """, unsafe_allow_html=True)
         
-        # 在卡片渲染后立即添加toggle，让它看起来在卡片内部
+        # 在卡片渲染后立即添加安装按钮和toggle，让它看起来在卡片内部
         col1, col2 = st.columns([6, 1])
         with col2:
             # 使用负的margin让toggle看起来在卡片内部
@@ -79,7 +79,7 @@ def render_component_center():
                 }
                 </style>
                 """, unsafe_allow_html=True)
-            
+
             checked = st.toggle(f"Enable", value=original_enabled, key=f"toggle_{name}")
             
             if checked and name not in current_enabled:
@@ -88,6 +88,18 @@ def render_component_center():
             # 检查是否有变化
             if checked != original_enabled:
                 has_unsaved_changes = True
+
+        with col1:
+            missing = manager.missing_requirements(getattr(comp, "requirements", []))
+            if missing:
+                if st.button("Install requirements", key=f"install_{name}"):
+                    with st.spinner("Installing..."):
+                        success = manager.install_requirements(missing)
+                    if success:
+                        st.success("Requirements installed")
+                    else:
+                        st.error("Failed to install requirements")
+                    st.rerun()
     
     # 显示未保存更改提示
     if has_unsaved_changes:

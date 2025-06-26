@@ -8,9 +8,12 @@ from component_base import BaseComponent
 class MyComponent(BaseComponent):
     name = "My Generator"
     description = "Does something amazing"
+    # Declare any additional packages your component depends on
+    requirements = ["pandas"]
 
     def render(self):
         import streamlit as st
+        self.logger("Rendering my component")
         st.write("Hello from my component")
 ```
 
@@ -26,7 +29,10 @@ For larger components that span multiple files, create a folder inside
 `__init__.py` exposing `get_component()` or a `main.py` file with the
 entry point.
 
-After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page. Any libraries required by your component should be installed in the Python environment running the UI.
+After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page.
+Declare additional libraries in a ``requirements`` list on your component class.
+Missing packages can be installed directly from the Component Center via the
+**Install requirements** button.
 
 ## Adding Configuration Items
 
