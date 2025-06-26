@@ -1,3 +1,5 @@
 {
-  "enabled": ["Echo Agent"]
+  "enabled": [
+    "Echo Agent"
+  ]
 }
