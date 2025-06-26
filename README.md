@@ -11,12 +11,13 @@ The repository ships with only a simple example component.  Complex generators s
    ```bash
    pip install -r requirements.txt
    ```
-2. Configure your LLM provider in `.env` (see `.env.example`).
-3. Run the UI:
+2. Run the UI:
    ```bash
    streamlit run web.py
    ```
-4. Use the sidebar to switch between the **Component Center** and pages provided by your enabled components. Enable or disable components from the Component Center.
+   The application will create a `.env` file from `.env.example` if it does not exist.
+3. Configure your API keys and choose an LLM provider from the **Configuration Center** page in the sidebar.
+4. Use the **Component Center** to enable or disable installed components.
 
 ## Adding Components
 See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for information on building your own generators.

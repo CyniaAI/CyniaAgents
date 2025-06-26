@@ -22,3 +22,21 @@ def get_component():
 ```
 
 After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page. Any libraries required by your component should be installed in the Python environment running the UI.
+
+## Adding Configuration Items
+
+Components can expose custom configuration values which are stored in the project's `.env` file. Use `config.register_config_item()` to define a new key, description and input type:
+
+```python
+import config
+
+config.register_config_item(
+    "MY_SETTING",
+    "Description of my setting",
+    default="some_default",
+    input_type="text"  # other options: "password" or "select"
+)
+```
+
+Registered items appear in the **Configuration Center** page where their values can be edited through the UI.
+When using ``input_type='select'`` pass an ``options`` list to define the dropdown choices.
