@@ -3,7 +3,10 @@ import importlib.util
 import json
 import os
 import pkgutil
-import logging
+import subprocess
+import sys
+
+from log_writer import logger
 
 from component_base import BaseComponent
 
@@ -16,6 +19,29 @@ class ComponentManager:
         self.enabled = []
         self.load_config()
         self.discover_components()
+
+    @staticmethod
+    def missing_requirements(requirements: list[str]) -> list[str]:
+        """Return a list of packages that are not installed."""
+        missing = []
+        for req in requirements:
+            try:
+                importlib.import_module(req)
+            except ImportError:
+                missing.append(req)
+        return missing
+
+    @staticmethod
+    def install_requirements(requirements: list[str]) -> bool:
+        """Install packages via pip. Return True if successful."""
+        if not requirements:
+            return True
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", *requirements])
+            return True
+        except Exception as e:
+            logger(f"Failed to install requirements {requirements}: {e}")
+            return False
 
     def load_config(self):
         if os.path.exists(self.config_path):
@@ -39,7 +65,7 @@ class ComponentManager:
             try:
                 module = importlib.import_module(f"{package_name}.{name}")
             except Exception as e:
-                logging.error(f"Failed to import module {name}: {e}")
+                logger(f"Failed to import module {name}: {e}")
                 continue
 
             if hasattr(module, "get_component"):
@@ -48,9 +74,7 @@ class ComponentManager:
                     if isinstance(comp, BaseComponent):
                         self.available[comp.name] = comp
                 except Exception as e:
-                    logging.error(
-                        f"Failed to load component from module {name}: {e}", exc_info=True
-                    )
+                    logger(f"Failed to load component from module {name}: {e}")
 
         # Also support components stored in a directory without __init__.py
         for entry in os.scandir(self.components_dir):
@@ -69,9 +93,7 @@ class ComponentManager:
                 try:
                     spec.loader.exec_module(module)
                 except Exception as e:
-                    logging.error(
-                        f"Failed to import module {entry.name} from main.py: {e}"
-                    )
+                    logger(f"Failed to import module {entry.name} from main.py: {e}")
                     continue
 
                 if hasattr(module, "get_component"):
@@ -80,9 +102,7 @@ class ComponentManager:
                         if isinstance(comp, BaseComponent):
                             self.available[comp.name] = comp
                     except Exception as e:
-                        logging.error(
-                            f"Failed to load component from module {entry.name}: {e}"
-                        )
+                        logger(f"Failed to load component from module {entry.name}: {e}")
 
     def get_enabled_components(self):
         return [c for c in self.available.values() if c.name in self.enabled]

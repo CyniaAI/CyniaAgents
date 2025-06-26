@@ -6,8 +6,10 @@ import utils
 class ExampleComponent(BaseComponent):
     name = "Echo Agent"
     description = "Demo agent that sends your prompt to the LLM and displays the response."
+    requirements: list[str] = []
 
     def __init__(self):
+        super().__init__()
         self.llm = utils.LLM()
         if "example_conv" not in st.session_state:
             st.session_state.example_conv = self.llm.create_conversation(
