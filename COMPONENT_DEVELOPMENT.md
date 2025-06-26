@@ -66,3 +66,90 @@ llm = LLM(provider="openai", model_name="gpt-4")
 ```
 Missing parameters fall back to values defined in `config.py`.
 
+## Building the UI
+
+Components live inside the Streamlit application and therefore have access to
+almost the entire Streamlit API.  You can use any of the regular Streamlit
+widgets to craft your interface.  The following best practices help keeping the
+UI tidy and responsive.
+
+### Organizing With Tabs
+
+When your component exposes multiple views, consider grouping them in tabs.
+
+```python
+def render(self):
+    import streamlit as st
+
+    tab_chat, tab_history = st.tabs(["Chat", "History"])
+
+    with tab_chat:
+        prompt = st.text_area("Prompt")
+        if st.button("Send"):
+            reply = self.llm.ask("You are a helpful assistant.", prompt)
+            st.write(reply)
+
+    with tab_history:
+        for msg in st.session_state.example_conv.history:
+            st.markdown(f"**{msg['role']}**: {msg['content']}")
+```
+
+Tabs keep related functionality together and make complex components easier to
+navigate.
+
+### Registering Custom Settings
+
+Use `config.register_config_item()` to make your own configuration options
+editable in the **Configuration Center**.  The values are stored in the project's
+`.env` file so they persist across restarts.
+
+```python
+import config
+
+config.register_config_item(
+    "MY_OPTION",
+    "Option available for my component",
+    default="default value",
+    input_type="select",
+    options=["a", "b", "c"],
+)
+```
+
+Read the value later with `config.MY_OPTION`.
+
+### Reporting Progress
+
+Long-running tasks can stream progress back to the page via a queue.  The worker
+thread pushes updates while the UI thread consumes them and refreshes a progress
+element.
+
+```python
+import queue
+import threading
+import time
+
+def worker(q: queue.Queue):
+    for i in range(10):
+        q.put(i + 1)
+        time.sleep(0.5)
+    q.put(None)
+
+def render(self):
+    import streamlit as st
+
+    q = queue.Queue()
+    threading.Thread(target=worker, args=(q,), daemon=True).start()
+
+    progress = st.progress(0)
+    while True:
+        value = q.get()
+        if value is None:
+            break
+        progress.progress(value / 10)
+    st.success("Done")
+```
+
+Using a queue keeps the UI responsive and works well with Streamlit's event
+loop.
+
+
