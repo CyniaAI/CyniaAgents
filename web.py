@@ -13,26 +13,38 @@ st.title("Cynia Agents UI")
 
 manager = ComponentManager()
 
-# Sidebar for component management
-st.sidebar.header("Components")
-for name, comp in manager.available.items():
-    enabled = name in manager.enabled
-    checked = st.sidebar.checkbox(f"{name}", value=enabled)
-    if checked and name not in manager.enabled:
-        manager.enabled.append(name)
-    if not checked and name in manager.enabled:
-        manager.enabled.remove(name)
 
-if st.sidebar.button("Save configuration"):
-    manager.save_config()
-    st.sidebar.success("Configuration saved")
+def render_component_center():
+    """UI for enabling/disabling components."""
+    st.header("Component Center")
+    for name, comp in manager.available.items():
+        enabled = name in manager.enabled
+        label = f"{name}"
+        if comp.description:
+            label += f" - {comp.description}"
+        checked = st.checkbox(label, value=enabled)
+        if checked and name not in manager.enabled:
+            manager.enabled.append(name)
+        if not checked and name in manager.enabled:
+            manager.enabled.remove(name)
 
-enabled_components = manager.get_enabled_components()
+    if st.button("Save configuration"):
+        manager.save_config()
+        st.success("Configuration saved")
 
-if not enabled_components:
-    st.info("No components enabled. Enable them in the sidebar.")
+
+def build_pages():
+    pages = {"Component Center": None}
+    for comp in manager.get_enabled_components():
+        pages[comp.name] = comp
+    return pages
+
+
+pages = build_pages()
+selected = st.sidebar.radio("Pages", list(pages.keys()))
+
+if selected == "Component Center":
+    render_component_center()
 else:
-    comp_names = [c.name for c in enabled_components]
-    selected = st.sidebar.selectbox("Active component", comp_names)
-    component = next(c for c in enabled_components if c.name == selected)
+    component = pages[selected]
     component.render()

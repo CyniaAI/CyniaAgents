@@ -16,7 +16,7 @@ The repository ships with only a simple example component.  Complex generators s
    ```bash
    streamlit run web.py
    ```
-4. Enable installed components in the sidebar and enjoy.
+4. Use the sidebar to switch between the **Component Center** and pages provided by your enabled components. Enable or disable components from the Component Center.
 
 ## Adding Components
 See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for information on building your own generators.

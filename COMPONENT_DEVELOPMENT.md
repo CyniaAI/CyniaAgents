@@ -21,4 +21,4 @@ def get_component():
     return MyComponent()
 ```
 
-After restarting the UI you can enable the component from the sidebar.  Any libraries required by your component should be installed in the Python environment running the UI.
+After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page. Any libraries required by your component should be installed in the Python environment running the UI.
