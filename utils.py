@@ -1,7 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 import chardet
 import sys
 import json
@@ -53,79 +53,171 @@ def initialize() -> None:
     logger(f"Launch. Platform {sys.platform}")
 
 
-def askgpt(
+class LLM:
+    """Helper class for interacting with the configured LLM provider."""
+
+    def __init__(
+        self,
+        provider: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model_name: str | None = None,
+    ) -> None:
+        self.provider = (provider or getattr(config, "LLM_PROVIDER", "openai")).lower()
+        self.api_key = api_key or config.API_KEY
+        self.base_url = base_url or config.BASE_URL
+        self.model_name = model_name or config.GENERATION_MODEL
+
+        self.client = _create_client(
+            self.provider, self.api_key, self.base_url, self.model_name
+        )
+        logger(
+            f"Initialized the {self.provider} LLM client with model {self.model_name}."
+        )
+
+    def create_conversation(self, system_prompt: str) -> "Conversation":
+        """Return a :class:`Conversation` object using this LLM."""
+
+        return Conversation(self, system_prompt)
+
+    def _get_client(self, model_name: str | None = None):
+        if model_name and model_name != self.model_name:
+            return _create_client(
+                self.provider, self.api_key, self.base_url, model_name
+            )
+        return self.client
+
+    def ask(
+        self,
         system_prompt: str,
         user_prompt: str,
-        model_name: str
+        model_name: str | None = None,
     ) -> str:
-    """
-    Interacts with the LLM using the specified prompts.
+        """Single-turn conversation returning the assistant reply as text."""
 
-    Args:
-        system_prompt (str): The system prompt.
-        user_prompt (str): The user prompt.
-        model_name (str): The model name to use.
+        client = self._get_client(model_name)
+        final_model = model_name or self.model_name
 
-    Returns:
-        str: The response from the LLM.
-    """
-    provider = getattr(config, "LLM_PROVIDER", "openai")
-    api_key = config.API_KEY
-    base_url = config.BASE_URL
+        if final_model in ["o1-preview", "o1-mini"]:
+            messages = [
+                HumanMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
+        else:
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
 
-    client = _create_client(provider, api_key, base_url, model_name)
+        logger(f"ask: system {system_prompt}")
+        logger(f"ask: user {user_prompt}")
 
-    logger(f"Initialized the {provider} LLM client.")
+        try:
+            response = client.invoke(messages)
+        except Exception as e:
+            logger(f"ask: invoke error {e}")
+            if "connect" in str(e).lower():
+                raise Exception(
+                    "Failed to connect to your LLM provider. Please check your configuration (make sure the BASE_URL ends with /v1) and internet connection."
+                )
+            if "api key" in str(e).lower():
+                raise Exception(
+                    "Your API key is invalid. Please check your configuration."
+                )
+            raise
 
-    # Define the messages for the conversation
-    if config.GENERATION_MODEL == "o1-preview" or config.GENERATION_MODEL == "o1-mini":
-        messages = [
-            HumanMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ]
-    else:
-        messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ]
+        logger(f"ask: response {response}")
 
-    logger(f"askgpt: system {system_prompt}")
-    logger(f"askgpt: user {user_prompt}")
-
-    # Create a chat completion
-    try:
-        response = client.invoke(messages)
-    except Exception as e:
-        logger(f"askgpt: invoke error {e}")
-        if "connect" in str(e).lower():
+        if "Too many requests" in str(response):
+            logger("Too many requests. Please try again later.")
             raise Exception(
-                "Failed to connect to your LLM provider. Please check your configuration (make sure the BASE_URL ends with /v1) and internet connection. IT IS NOT A BUG OF BUKKITGPT."
+                "Your LLM provider has rate limited you. Please try again later."
             )
-        if "api key" in str(e).lower():
+
+        try:
+            assistant_reply = response.content
+            logger(f"ask: extracted reply {assistant_reply}")
+        except Exception as e:
+            logger(f"ask: error extracting reply {e}")
             raise Exception(
-                "Your API key is invalid. Please check your configuration. IT IS NOT A BUG OF BUKKITGPT."
+                "Your LLM didn't return a valid response. Check if the API provider supports OpenAI response format."
             )
-        raise
 
-    logger(f"askgpt: response {response}")
+        return assistant_reply
 
-    if "Too many requests" in str(response):
-        logger("Too many requests. Please try again later.")
-        raise Exception(
-            "Your LLM provider has rate limited you. Please try again later. IT IS NOT A BUG OF BUKKITGPT."
-        )
+    def _conversation(
+        self, messages: list[dict], model_name: str | None = None
+    ) -> str:
+        """Internal helper for multi-turn conversation using a history list."""
 
-    # Extract the assistant's reply
-    try:
-        assistant_reply = response.content
-        logger(f"askgpt: extracted reply {assistant_reply}")
-    except Exception as e:
-        logger(f"askgpt: error extracting reply {e}")
-        raise Exception(
-            "Your LLM didn't return a valid response. Check if the API provider supportes OpenAI response format."
-        )
+        client = self._get_client(model_name)
+        final_model = model_name or self.model_name
 
-    return assistant_reply
+        langchain_messages = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                if final_model in ["o1-preview", "o1-mini"]:
+                    langchain_messages.append(HumanMessage(content=content))
+                else:
+                    langchain_messages.append(SystemMessage(content=content))
+            elif role == "assistant":
+                langchain_messages.append(AIMessage(content=content))
+            else:
+                langchain_messages.append(HumanMessage(content=content))
+
+        logger(f"conversation: messages {messages}")
+
+        try:
+            response = client.invoke(langchain_messages)
+        except Exception as e:
+            logger(f"conversation: invoke error {e}")
+            raise
+
+        logger(f"conversation: response {response}")
+
+        try:
+            assistant_reply = response.content
+            logger(f"conversation: extracted reply {assistant_reply}")
+        except Exception as e:
+            logger(f"conversation: error extracting reply {e}")
+            raise Exception(
+                "Your LLM didn't return a valid response. Check if the API provider supports OpenAI response format."
+            )
+
+        return assistant_reply
+
+
+class Conversation:
+    """Manage a conversation with message history."""
+
+    def __init__(self, llm: LLM, system_prompt: str) -> None:
+        self.llm = llm
+        self.messages: list[dict] = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+    def send(self, user_prompt: str, model_name: str | None = None) -> str:
+        """Append a user message, get the assistant reply and store it."""
+
+        self.messages.append({"role": "user", "content": user_prompt})
+        reply = self.llm._conversation(self.messages, model_name)
+        self.messages.append({"role": "assistant", "content": reply})
+        return reply
+
+    @property
+    def history(self) -> list[dict]:
+        """Return the full conversation history."""
+
+        return self.messages
+
+
+def askgpt(system_prompt: str, user_prompt: str, model_name: str) -> str:
+    """Backward compatible helper calling :class:`LLM`."""
+
+    llm = LLM(model_name=model_name)
+    return llm.ask(system_prompt, user_prompt)
 
 
 def mixed_decode(text: str) -> str:
