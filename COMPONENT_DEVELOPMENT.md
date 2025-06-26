@@ -21,6 +21,11 @@ def get_component():
     return MyComponent()
 ```
 
+For larger components that span multiple files, create a folder inside
+`components/` instead.  The directory should either contain an
+`__init__.py` exposing `get_component()` or a `main.py` file with the
+entry point.
+
 After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page. Any libraries required by your component should be installed in the Python environment running the UI.
 
 ## Adding Configuration Items

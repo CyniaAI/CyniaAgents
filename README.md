@@ -21,6 +21,7 @@ The repository ships with only a simple example component.  Complex generators s
 
 ## Adding Components
 See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for information on building your own generators.
+Components can be a single Python file or a folder containing multiple files.
 
 ## Using the LLM Helper
 Components can talk to the configured language model through the `LLM` class in `utils.py`.
