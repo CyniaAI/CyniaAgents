@@ -128,50 +128,6 @@ def askgpt(
     return assistant_reply
 
 
-def response_to_action(msg) -> str:
-    """
-    Converts a response from the LLM to an action.
-
-    Args:
-        msg (str): The response from the LLM.
-
-    Returns:
-        str: The action to take.
-    """
-
-    pattern = r"```json(.*?)```"
-    matches = re.findall(pattern, msg, re.DOTALL)
-    if not matches:
-        raise Exception("Invalid response format from LLM. Expected JSON code block.")
-    json_codes = matches[0].strip()
-
-    text = json.loads(json_codes)
-
-    codes = text["codes"]
-
-    for section in codes:
-        file = section["file"]
-        code = section["code"].replace("%linefeed%", "\n")
-
-        paths = file.split("/")
-
-        # Join the list elements to form a path
-        path = os.path.join(*paths)
-
-        # Get the directory path and the file name
-        dir_path, file_name = os.path.split(path)
-
-        # Create directories, if they don't exist
-        try:
-            os.makedirs(dir_path, exist_ok=True)
-        except FileNotFoundError:
-            pass
-
-        # Create the file
-        with open(path, "w") as f:
-            f.write(code)  # Write an empty string to the file
-
-
 def mixed_decode(text: str) -> str:
     """
     Decode a mixed text containing both normal text and a byte sequence.
