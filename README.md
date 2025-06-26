@@ -16,7 +16,7 @@ The repository ships with only a simple example component.  Complex generators s
    streamlit run web.py
    ```
    The application will create a `.env` file from `.env.example` if it does not exist.
-3. Configure your API keys from the **Configuration Center** page in the sidebar.
+3. Configure your API keys and choose an LLM provider from the **Configuration Center** page in the sidebar.
 4. Use the **Component Center** to enable or disable installed components.
 
 ## Adding Components

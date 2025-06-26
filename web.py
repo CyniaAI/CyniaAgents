@@ -113,9 +113,21 @@ def render_config_center():
 
     with st.form("config_form"):
         inputs = {}
-        for key, desc in config.CONFIG_ITEMS.items():
+        for key, meta in config.CONFIG_ITEMS.items():
+            desc = meta.get("description", "")
             current = getattr(config, key, "")
-            inputs[key] = st.text_input(key, value=current, help=desc)
+            field_type = meta.get("type", "text")
+            if field_type == "select":
+                options = meta.get("options", [])
+                if current in options:
+                    index = options.index(current)
+                else:
+                    index = 0
+                inputs[key] = st.selectbox(key, options, index=index, help=desc)
+            elif field_type == "password":
+                inputs[key] = st.text_input(key, value=current, help=desc, type="password")
+            else:
+                inputs[key] = st.text_input(key, value=current, help=desc)
         submitted = st.form_submit_button("Save")
 
     if submitted:

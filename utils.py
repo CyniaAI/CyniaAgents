@@ -38,7 +38,7 @@ def initialize() -> None:
     """
     Initializes the software.
 
-    This function logs the software launch, including the version number and platform.
+    This function logs the software launch and platform information.
 
     Args:
         None
@@ -50,7 +50,7 @@ def initialize() -> None:
         locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
     except locale.Error:
         logger("Locale en_US.UTF-8 not available, using default locale.")
-    logger(f"Launch. Software version {config.VERSION_NUMBER}, platform {sys.platform}")
+    logger(f"Launch. Platform {sys.platform}")
 
 
 def askgpt(

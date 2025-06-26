@@ -4,15 +4,23 @@ import shutil
 from dotenv import load_dotenv
 from log_writer import logger
 
-# Built-in registry of configuration items and their descriptions.
-# Components can add new items at runtime via ``register_config_item``.
+# Built-in registry of configuration items.
+# Each entry maps the key name to a dictionary containing a description and UI
+# hints. Components can extend this dictionary at runtime via
+# ``register_config_item``.
 CONFIG_ITEMS = {
-    "LLM_PROVIDER": "LLM service provider (openai, anthropic, google)",
-    "API_KEY": "API key for the LLM provider",
-    "BASE_URL": "Base URL for the API provider",
-    "GENERATION_MODEL": "Model used for generation",
-    "FIXING_MODEL": "Model used for fixing",
-    "VERSION_NUMBER": "Application version number",
+    "LLM_PROVIDER": {
+        "description": "LLM service provider",
+        "type": "select",
+        "options": ["openai", "anthropic", "google"],
+    },
+    "API_KEY": {
+        "description": "API key for the LLM provider",
+        "type": "password",
+    },
+    "BASE_URL": {"description": "Base URL for the API provider"},
+    "GENERATION_MODEL": {"description": "Model used for generation"},
+    "FIXING_MODEL": {"description": "Model used for fixing"},
 }
 
 
@@ -35,14 +43,14 @@ def load_config():
     # Load environment variables from .env file
     load_dotenv()
     
-    # Configuration keys that should be loaded from .env
-    env_config_keys = list(CONFIG_ITEMS.keys())
-    
     # Load configuration from .env file
-    for key in env_config_keys:
-        value = os.getenv(key, '')
+    for key, meta in CONFIG_ITEMS.items():
+        default = meta.get("default", "")
+        value = os.getenv(key, default)
         globals()[key] = value
-        logger(f"config: {key} -> {value if key != 'API_KEY' else '********'}")
+        logger(
+            f"config: {key} -> {value if key != 'API_KEY' else '********'}"
+        )
       # Load prompts from prompts.json file
     try:
         with open('prompts.json', 'r', encoding='utf-8') as f:
@@ -156,7 +164,13 @@ def edit_config(key, value):
     return True
 
 
-def register_config_item(key: str, description: str, default: str = "") -> None:
+def register_config_item(
+    key: str,
+    description: str,
+    default: str = "",
+    input_type: str = "text",
+    options: list | None = None,
+) -> None:
     """Register a new configuration item.
 
     Components can call this function to expose additional configuration values
@@ -166,8 +180,17 @@ def register_config_item(key: str, description: str, default: str = "") -> None:
         key: The name of the configuration entry.
         description: Description displayed in the configuration center.
         default: Default value used if the key is missing from ``.env``.
+        input_type: The type of UI input (``text``, ``password`` or ``select``).
+        options: Options for ``select`` inputs.
     """
-    CONFIG_ITEMS[key] = description
+    CONFIG_ITEMS[key] = {
+        "description": description,
+        "type": input_type,
+    }
+    if options:
+        CONFIG_ITEMS[key]["options"] = options
+    if default:
+        CONFIG_ITEMS[key]["default"] = default
     value = os.getenv(key, default)
     globals()[key] = value
 
