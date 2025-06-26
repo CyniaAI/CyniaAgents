@@ -49,7 +49,7 @@ class ComponentManager:
                         self.available[comp.name] = comp
                 except Exception as e:
                     logging.error(
-                        f"Failed to load component from module {name}: {e}"
+                        f"Failed to load component from module {name}: {e}", exc_info=True
                     )
 
         # Also support components stored in a directory without __init__.py
