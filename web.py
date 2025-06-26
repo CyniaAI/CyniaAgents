@@ -94,7 +94,7 @@ def render_component_center():
             if missing:
                 if st.button("Install requirements", key=f"install_{name}"):
                     with st.spinner("Installing..."):
-                        success = manager.install_requirements(comp.requirements)
+                        success = manager.install_requirements(missing)
                     if success:
                         st.success("Requirements installed")
                     else:
