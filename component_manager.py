@@ -33,11 +33,19 @@ class ComponentManager:
             return
         package_name = self.components_dir.replace(os.sep, ".")
         for _, name, _ in pkgutil.iter_modules([self.components_dir]):
-            module = importlib.import_module(f"{package_name}.{name}")
+            try:
+                module = importlib.import_module(f"{package_name}.{name}")
+            except Exception as e:
+                logging.error(f"Failed to import module {name}: {e}")
+                continue
+
             if hasattr(module, "get_component"):
-                comp = module.get_component()
-                if isinstance(comp, BaseComponent):
-                    self.available[comp.name] = comp
+                try:
+                    comp = module.get_component()
+                    if isinstance(comp, BaseComponent):
+                        self.available[comp.name] = comp
+                except Exception as e:
+                    logging.error(f"Failed to load component from module {name}: {e}")
 
     def get_enabled_components(self):
         return [c for c in self.available.values() if c.name in self.enabled]
