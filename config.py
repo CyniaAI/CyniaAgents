@@ -1,7 +1,19 @@
 import os
 import json
+import shutil
 from dotenv import load_dotenv
 from log_writer import logger
+
+# Built-in registry of configuration items and their descriptions.
+# Components can add new items at runtime via ``register_config_item``.
+CONFIG_ITEMS = {
+    "LLM_PROVIDER": "LLM service provider (openai, anthropic, google)",
+    "API_KEY": "API key for the LLM provider",
+    "BASE_URL": "Base URL for the API provider",
+    "GENERATION_MODEL": "Model used for generation",
+    "FIXING_MODEL": "Model used for fixing",
+    "VERSION_NUMBER": "Application version number",
+}
 
 
 def load_config():
@@ -16,14 +28,15 @@ def load_config():
     Returns:
         None
     """
+    # Ensure the .env file exists by copying from the example if necessary
+    if not os.path.exists('.env') and os.path.exists('.env.example'):
+        shutil.copy('.env.example', '.env')
+
     # Load environment variables from .env file
     load_dotenv()
     
     # Configuration keys that should be loaded from .env
-    env_config_keys = [
-        'LLM_PROVIDER', 'API_KEY', 'BASE_URL', 'GENERATION_MODEL', 'FIXING_MODEL',
-        'VERSION_NUMBER'
-    ]
+    env_config_keys = list(CONFIG_ITEMS.keys())
     
     # Load configuration from .env file
     for key in env_config_keys:
@@ -141,6 +154,22 @@ def edit_config(key, value):
         globals()[key] = str(value)
 
     return True
+
+
+def register_config_item(key: str, description: str, default: str = "") -> None:
+    """Register a new configuration item.
+
+    Components can call this function to expose additional configuration values
+    in the UI.
+
+    Args:
+        key: The name of the configuration entry.
+        description: Description displayed in the configuration center.
+        default: Default value used if the key is missing from ``.env``.
+    """
+    CONFIG_ITEMS[key] = description
+    value = os.getenv(key, default)
+    globals()[key] = value
 
 
 load_config()

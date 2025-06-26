@@ -106,8 +106,30 @@ def render_component_center():
             st.rerun()
 
 
+def render_config_center():
+    """UI for editing .env configuration values."""
+    st.header("⚙️ Configuration Center")
+    st.markdown("Edit configuration values stored in the `.env` file.")
+
+    with st.form("config_form"):
+        inputs = {}
+        for key, desc in config.CONFIG_ITEMS.items():
+            current = getattr(config, key, "")
+            inputs[key] = st.text_input(key, value=current, help=desc)
+        submitted = st.form_submit_button("Save")
+
+    if submitted:
+        for k, v in inputs.items():
+            config.edit_config(k, v)
+        st.success("Configuration saved successfully!")
+        st.rerun()
+
+
 def build_pages():
-    pages = {"Component Center": None}
+    pages = {
+        "Component Center": None,
+        "Configuration Center": None,
+    }
     for comp in manager.get_enabled_components():
         pages[comp.name] = comp
     return pages
@@ -123,6 +145,10 @@ st.sidebar.markdown("---")
 # 显示组件中心
 if st.sidebar.button("🏠 Component Center", use_container_width=True):
     st.session_state.selected_page = "Component Center"
+
+# 显示配置中心
+if st.sidebar.button("⚙️ Configuration Center", use_container_width=True):
+    st.session_state.selected_page = "Configuration Center"
 
 # 显示启用的组件
 if manager.get_enabled_components():
@@ -146,6 +172,8 @@ st.title("Cynia Agents UI")
 
 if st.session_state.selected_page == "Component Center":
     render_component_center()
+elif st.session_state.selected_page == "Configuration Center":
+    render_config_center()
 else:
     component = pages.get(st.session_state.selected_page)
     if component:
