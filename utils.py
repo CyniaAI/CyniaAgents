@@ -7,6 +7,8 @@ import sys
 import json
 import locale
 import os
+import base64
+import mimetypes
 
 from log_writer import logger
 import config
@@ -32,6 +34,15 @@ def _create_client(provider: str, api_key: str, base_url: str, model_name: str):
             "X-Title": "CyniaAI",
         },
     )
+
+
+def _image_to_data_url(path: str) -> str:
+    """Return the data URL for an image file."""
+    mime, _ = mimetypes.guess_type(path)
+    mime = mime or "image/png"
+    with open(path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    return f"data:{mime};base64,{b64}"
 
 
 def initialize() -> None:
@@ -91,22 +102,40 @@ class LLM:
         self,
         system_prompt: str,
         user_prompt: str,
+        image_path: str | None = None,
         model_name: str | None = None,
     ) -> str:
-        """Single-turn conversation returning the assistant reply as text."""
+        """Single-turn conversation returning the assistant reply as text.
+
+        Args:
+            system_prompt: The system prompt for the model.
+            user_prompt: The user prompt text.
+            image_path: Optional path to an image included with the prompt.
+            model_name: Optional model override.
+        """
 
         client = self._get_client(model_name)
         final_model = model_name or self.model_name
 
+        if image_path:
+            image_url = _image_to_data_url(image_path)
+            user_content = [
+                {"type": "text", "text": user_prompt},
+                {"type": "image_url", "image_url": {"url": image_url}},
+            ]
+            user_message = HumanMessage(content=user_content)
+        else:
+            user_message = HumanMessage(content=user_prompt)
+
         if final_model in ["o1-preview", "o1-mini"]:
             messages = [
                 HumanMessage(content=system_prompt),
-                HumanMessage(content=user_prompt),
+                user_message,
             ]
         else:
             messages = [
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=user_prompt),
+                user_message,
             ]
 
         logger(f"ask: system {system_prompt}")
@@ -213,11 +242,16 @@ class Conversation:
         return self.messages
 
 
-def askgpt(system_prompt: str, user_prompt: str, model_name: str) -> str:
+def askgpt(
+    system_prompt: str,
+    user_prompt: str,
+    model_name: str,
+    image_path: str | None = None,
+) -> str:
     """Backward compatible helper calling :class:`LLM`."""
 
     llm = LLM(model_name=model_name)
-    return llm.ask(system_prompt, user_prompt)
+    return llm.ask(system_prompt, user_prompt, image_path=image_path)
 
 
 def mixed_decode(text: str) -> str:
