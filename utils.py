@@ -38,6 +38,10 @@ def _create_client(provider: str, api_key: str, base_url: str, model_name: str):
 
 def _image_to_data_url(path: str) -> str:
     """Return the data URL for an image file."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"The file at path '{path}' does not exist.")
+    if not os.access(path, os.R_OK):
+        raise PermissionError(f"The file at path '{path}' is not readable.")
     mime, _ = mimetypes.guess_type(path)
     mime = mime or "image/png"
     with open(path, "rb") as f:
