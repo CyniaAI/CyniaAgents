@@ -21,6 +21,7 @@ The repository ships with only a simple example component.  Complex generators s
    Components may declare additional Python packages they depend on.
    If a component has missing requirements, an **Install requirements** button
    will appear on its card to install them with one click.
+5. Browse generated files in the **Artifact Center**.
 
 ## Adding Components
 See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for information on building your own generators.

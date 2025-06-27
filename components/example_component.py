@@ -1,6 +1,11 @@
 from component_base import BaseComponent
 import streamlit as st
 import utils
+import artifact_manager
+import tempfile
+import os
+
+artifact_manager.register_artifact_type("text")
 
 
 class ExampleComponent(BaseComponent):
@@ -26,6 +31,19 @@ class ExampleComponent(BaseComponent):
             f"{m['role']}: {m['content']}" for m in st.session_state.example_conv.history[1:]
         )
         st.text_area("Conversation", value=history_text, height=300)
+
+        if st.button("Save Conversation Artifact"):
+            with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as f:
+                f.write(history_text)
+                temp_path = f.name
+            artifact_manager.write_artifact(
+                self.name,
+                temp_path,
+                "Conversation log",
+                "text",
+            )
+            os.remove(temp_path)
+            st.success("Artifact saved")
 
 def get_component():
     return ExampleComponent()
