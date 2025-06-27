@@ -35,8 +35,9 @@ Create an instance and call `ask()` for a single response or start a `Conversati
 from utils import LLM
 
 llm = LLM()
-reply = llm.ask("You are a helpful assistant.", "Hello")
+reply = llm.ask("You are a helpful assistant.", "Describe this image", image_path="example.png")
 ```
+Omit `image_path` for text-only prompts.
 To hold a conversation create a `Conversation` instance and call `send()`:
 
 ```python

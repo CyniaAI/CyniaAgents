@@ -60,7 +60,12 @@ Use the :class:`LLM` helper from ``utils`` for any language model requests:
 from utils import LLM
 
 llm = LLM()
-response = llm.ask("You are a helpful assistant.", "Hello")
+response = llm.ask(
+    "You are a helpful assistant.",
+    "Describe this image",
+    image_path="example.png",
+)
+# Omit image_path for text-only prompts
 ```
 
 For multi-turn interactions create a conversation instance and call ``send()``:
@@ -97,7 +102,11 @@ def render(self):
     with tab_chat:
         prompt = st.text_area("Prompt")
         if st.button("Send"):
-            reply = self.llm.ask("You are a helpful assistant.", prompt)
+            reply = self.llm.ask(
+                "You are a helpful assistant.",
+                prompt,
+                image_path="example.png",
+            )
             st.write(reply)
 
     with tab_history:
