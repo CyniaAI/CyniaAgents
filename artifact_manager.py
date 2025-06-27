@@ -34,7 +34,7 @@ def write_artifact(component: str, src_path: str, remark: str, artifact_type: st
         raise FileNotFoundError(src_path)
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
     base = os.path.basename(src_path)
-    unique = f"{int(time.time())}_{base}"
+    unique = f"{uuid.uuid4()}_{base}"
     dst_path = os.path.join(ARTIFACTS_DIR, unique)
     shutil.copy2(src_path, dst_path)
     size = os.path.getsize(dst_path)
