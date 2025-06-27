@@ -1,7 +1,11 @@
+![Demo](public/demo.png)
+
 # Cynia Agents
 
 Cynia Agents is a lightweight framework for running generative agents through a Streamlit interface.  
 Generation logic lives in installable **components** which can be added or removed without modifying the UI.
+
+The framework provides unified LLM, configuration, and artifact management, allowing agent developers to focus on building components that generate content.
 
 The repository ships with only a simple example component.  Complex generators such as the Bukkit plugin agent can be distributed separately and dropped into the `components` folder.
 
@@ -13,40 +17,37 @@ The repository ships with only a simple example component.  Complex generators s
    ```
 2. Run the UI:
    ```bash
-   streamlit run web.py
+   python -m streamlit run web.py
    ```
    The application will create a `.env` file from `.env.example` if it does not exist.
 3. Configure your API keys and choose an LLM provider from the **Configuration Center** page in the sidebar.
-4. Use the **Component Center** to enable or disable installed components.
-   Components may declare additional Python packages they depend on.
-   If a component has missing requirements, an **Install requirements** button
-   will appear on its card to install them with one click.
+4. Download a component and place it in the `components` folder.
+   Use the **Component Center** to enable or disable installed components.
+   Components may declare additional Python packages they depend on. The component developer are expected to instruct users to install these dependencies, commonly in the component's README.
+   The framework may not identify the component if you add a component without installing its dependencies. You should always restart the Streamlit server after installing dependencies.
 5. Browse generated files in the **Artifact Center**.
 
-## Adding Components
+## Developing Components
+
+A component is a Python module placed inside the `components/` directory. Here's a minimal example of a CyniaAgents component.
+
+```python
+from component_base import BaseComponent
+
+class MyComponent(BaseComponent):
+    name = "My Generator"
+    description = "Does something amazing"
+    # Declare any additional packages your component depends on
+    requirements = ["pandas"]
+
+    def render(self):
+        import streamlit as st
+        self.logger("Rendering my component")
+        st.write("Hello from my component")
+```
+
 See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for information on building your own generators.
 Components can be a single Python file or a folder containing multiple files.
-
-## Using the LLM Helper
-Components can talk to the configured language model through the `LLM` class in `utils.py`.
-Create an instance and call `ask()` for a single response or start a `Conversation` for multi-turn chat.
-
-```python
-from utils import LLM
-
-llm = LLM()
-reply = llm.ask("You are a helpful assistant.", "Describe this image", image_path="example.png")
-```
-Omit `image_path` for text-only prompts.
-To hold a conversation create a `Conversation` instance and call `send()`:
-
-```python
-conv = llm.create_conversation("You are a helpful assistant.")
-reply = conv.send("Hello")
-```
-The conversation history is available via ``conv.history``.
-
-The constructor accepts optional `provider`, `api_key`, `base_url` and `model_name` parameters, falling back to configuration values.
 
 
 ## License
