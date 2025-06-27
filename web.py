@@ -1,8 +1,10 @@
 import streamlit as st
+import os
 
 import config
 import utils
 from component_manager import ComponentManager
+import artifact_manager
 
 
 utils.initialize()
@@ -10,6 +12,25 @@ utils.initialize()
 st.set_page_config(page_title="Cynia Agents", page_icon="🧩")
 
 manager = ComponentManager()
+
+
+def render_artifact_center():
+    """UI for browsing generated artifacts."""
+    st.header("📦 Artifact Center")
+    artifacts = artifact_manager.list_artifacts()
+    if not artifacts:
+        st.info("No artifacts available.")
+        return
+    for art in artifacts:
+        file_path = os.path.join(artifact_manager.ARTIFACTS_DIR, art["file"])
+        cols = st.columns([3, 2, 1, 3, 1])
+        cols[0].write(art["file"])
+        cols[1].write(art.get("component", ""))
+        cols[2].write(f"{art.get('size', 0)} bytes")
+        cols[3].write(art.get("remark", ""))
+        with open(file_path, "rb") as f:
+            cols[4].download_button("Download", f.read(), file_name=art["file"])
+        st.markdown("---")
 
 
 def render_component_center():
@@ -153,6 +174,7 @@ def build_pages():
     pages = {
         "Component Center": None,
         "Configuration Center": None,
+        "Artifact Center": None,
     }
     for comp in manager.get_enabled_components():
         pages[comp.name] = comp
@@ -173,6 +195,10 @@ if st.sidebar.button("🏠 Component Center", use_container_width=True):
 # 显示配置中心
 if st.sidebar.button("⚙️ Configuration Center", use_container_width=True):
     st.session_state.selected_page = "Configuration Center"
+
+# 显示Artifact中心
+if st.sidebar.button("📦 Artifact Center", use_container_width=True):
+    st.session_state.selected_page = "Artifact Center"
 
 # 显示启用的组件
 if manager.get_enabled_components():
@@ -198,6 +224,8 @@ if st.session_state.selected_page == "Component Center":
     render_component_center()
 elif st.session_state.selected_page == "Configuration Center":
     render_config_center()
+elif st.session_state.selected_page == "Artifact Center":
+    render_artifact_center()
 else:
     component = pages.get(st.session_state.selected_page)
     if component:
