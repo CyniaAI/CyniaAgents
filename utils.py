@@ -123,7 +123,7 @@ class LLM:
                 {"type": "text", "text": user_prompt},
                 {"type": "image_url", "image_url": {"url": image_url}},
             ]
-            user_message = HumanMessage(content=user_content)
+            user_message = HumanMessage(content=json.dumps(user_content))
         else:
             user_message = HumanMessage(content=user_prompt)
 
