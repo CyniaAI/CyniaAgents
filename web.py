@@ -50,12 +50,19 @@ def render_component_center():
     for name, comp in manager.available.items():
         original_enabled = name in manager.enabled
         
+        # 检查是否有缺失的依赖
+        missing = manager.missing_requirements(getattr(comp, "requirements", []))
+        has_missing_deps = bool(missing)
+        
+        # 如果有缺失依赖，则不能启用组件
+        can_enable = not has_missing_deps
+        
         # 先获取toggle状态来确定颜色
         toggle_key = f"toggle_{name}"
         if toggle_key in st.session_state:
-            checked = st.session_state[toggle_key]
+            checked = st.session_state[toggle_key] and can_enable
         else:
-            checked = original_enabled
+            checked = original_enabled and can_enable
             
         # 根据当前toggle状态设置颜色
         if checked:
@@ -88,8 +95,15 @@ def render_component_center():
             </div>
             """, unsafe_allow_html=True)
         
-        # 在卡片渲染后立即添加安装按钮和toggle，让它看起来在卡片内部
+        # 在卡片渲染后立即添加依赖信息和toggle，让它看起来在卡片内部
         col1, col2 = st.columns([6, 1])
+        
+        with col1:
+            if has_missing_deps:
+                st.error(f"⚠️ Missing dependencies: {', '.join(missing)}")
+                st.info(f"📋 Install command: `pip install {' '.join(missing)}`")
+                st.warning("Please install the missing dependencies and restart the Streamlit service.")
+        
         with col2:
             # 使用负的margin让toggle看起来在卡片内部
             st.markdown("""
@@ -101,26 +115,19 @@ def render_component_center():
                 </style>
                 """, unsafe_allow_html=True)
 
-            checked = st.toggle(f"Enable", value=original_enabled, key=f"toggle_{name}")
-            
-            if checked and name not in current_enabled:
-                current_enabled.append(name)
-            
-            # 检查是否有变化
-            if checked != original_enabled:
-                has_unsaved_changes = True
-
-        with col1:
-            missing = manager.missing_requirements(getattr(comp, "requirements", []))
-            if missing:
-                if st.button("Install requirements", key=f"install_{name}"):
-                    with st.spinner("Installing..."):
-                        success = manager.install_requirements(missing)
-                    if success:
-                        st.success("Requirements installed")
-                    else:
-                        st.error("Failed to install requirements")
-                    st.rerun()
+            # 如果有缺失依赖，禁用toggle
+            if has_missing_deps:
+                st.toggle(f"Enable", value=False, key=f"toggle_{name}", disabled=True, 
+                         help="Cannot enable: missing dependencies")
+            else:
+                checked = st.toggle(f"Enable", value=original_enabled, key=f"toggle_{name}")
+                
+                if checked and name not in current_enabled:
+                    current_enabled.append(name)
+                
+                # 检查是否有变化
+                if checked != original_enabled:
+                    has_unsaved_changes = True
     
     # 显示未保存更改提示
     if has_unsaved_changes:
