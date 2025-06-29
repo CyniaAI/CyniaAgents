@@ -32,7 +32,9 @@ entry point.
 After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page.
 Declare additional libraries in a ``requirements`` list on your component class.
 Missing packages can be installed directly from the Component Center via the
-**Install requirements** button.
+**Install requirements** button. Components that fail to load because their
+dependencies are missing still appear in the list but remain inactive until the
+requirements are installed and the Streamlit service is restarted.
 
 ## Adding Configuration Items
 

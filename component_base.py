@@ -19,3 +19,25 @@ class BaseComponent:
 def get_component():
     """Dummy to satisfy loader when no component is implemented."""
     return BaseComponent()
+
+
+class PlaceholderComponent(BaseComponent):
+    """Component shown when the real module failed to load."""
+
+    def __init__(self, name: str, description: str, requirements: list[str]):
+        super().__init__()
+        self.name = name
+        self.description = description
+        self.requirements = requirements
+
+    def render(self):
+        import streamlit as st
+
+        st.error(
+            "This component could not be loaded because required libraries are missing."
+        )
+        if self.requirements:
+            st.info(
+                "Install the missing dependencies from the Component Center and restart the service to activate this component."
+            )
+

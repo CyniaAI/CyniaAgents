@@ -24,7 +24,7 @@ The repository ships with only a simple example component.  Complex generators s
 4. Download a component and place it in the `components` folder.
    Use the **Component Center** to enable or disable installed components.
    Components may declare additional Python packages they depend on. The component developer are expected to instruct users to install these dependencies, commonly in the component's README.
-   The framework may not identify the component if you add a component without installing its dependencies. You should always restart the Streamlit server after installing dependencies.
+   If a component fails to load because dependencies are missing it still appears in the Component Center. Use the **Install requirements** button and restart the Streamlit server to activate it.
 5. Browse generated files in the **Artifact Center**.
 
 ## Developing Components

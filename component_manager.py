@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+import ast
 import json
 import os
 import pkgutil
@@ -8,7 +9,7 @@ import sys
 
 from log_writer import logger
 
-from component_base import BaseComponent
+from component_base import BaseComponent, PlaceholderComponent
 
 
 class ComponentManager:
@@ -43,6 +44,49 @@ class ComponentManager:
             logger(f"Failed to install requirements {requirements}: {e}")
             return False
 
+    @staticmethod
+    def _extract_metadata(path: str) -> dict:
+        """Parse component file for class metadata without importing."""
+        meta: dict = {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=path)
+        except Exception as e:
+            logger(f"Failed to parse {path} for metadata: {e}")
+            return meta
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for base in node.bases:
+                    if isinstance(base, ast.Name) and base.id == "BaseComponent":
+                        for stmt in node.body:
+                            if (
+                                isinstance(stmt, ast.Assign)
+                                and len(stmt.targets) == 1
+                                and isinstance(stmt.targets[0], ast.Name)
+                            ):
+                                key = stmt.targets[0].id
+                                if key in {"name", "description"} and isinstance(
+                                    stmt.value, (ast.Str, ast.Constant)
+                                ):
+                                    meta[key] = (
+                                        stmt.value.s
+                                        if hasattr(stmt.value, "s")
+                                        else stmt.value.value
+                                    )
+                                elif key == "requirements" and isinstance(
+                                    stmt.value, (ast.List, ast.Tuple)
+                                ):
+                                    reqs = []
+                                    for elt in stmt.value.elts:
+                                        if isinstance(elt, (ast.Str, ast.Constant)):
+                                            reqs.append(
+                                                elt.s if hasattr(elt, "s") else elt.value
+                                            )
+                                    meta[key] = reqs
+                        return meta
+        return meta
+
     def load_config(self):
         if os.path.exists(self.config_path):
             with open(self.config_path, "r", encoding="utf-8") as f:
@@ -62,10 +106,19 @@ class ComponentManager:
         package_name = self.components_dir.replace(os.sep, ".")
         # Discover regular modules and packages first
         for _, name, _ in pkgutil.iter_modules([self.components_dir]):
+            module_path = os.path.join(self.components_dir, f"{name}.py")
             try:
                 module = importlib.import_module(f"{package_name}.{name}")
             except Exception as e:
                 logger(f"Failed to import module {name}: {e}")
+                meta = self._extract_metadata(module_path)
+                if meta.get("name"):
+                    comp = PlaceholderComponent(
+                        meta.get("name", name),
+                        meta.get("description", ""),
+                        meta.get("requirements", []),
+                    )
+                    self.available[comp.name] = comp
                 continue
 
             if hasattr(module, "get_component"):
@@ -94,6 +147,14 @@ class ComponentManager:
                     spec.loader.exec_module(module)
                 except Exception as e:
                     logger(f"Failed to import module {entry.name} from main.py: {e}")
+                    meta = self._extract_metadata(main_py)
+                    if meta.get("name"):
+                        comp = PlaceholderComponent(
+                            meta.get("name", entry.name),
+                            meta.get("description", ""),
+                            meta.get("requirements", []),
+                        )
+                        self.available[comp.name] = comp
                     continue
 
                 if hasattr(module, "get_component"):
