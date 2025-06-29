@@ -45,7 +45,22 @@ class ComponentManager:
             return False
 
     @staticmethod
-    def _extract_metadata(path: str) -> dict:
+    def _read_requirements_file(req_path: str) -> list[str]:
+        """Return package names listed in a requirements.txt file."""
+        requirements: list[str] = []
+        if os.path.isfile(req_path):
+            try:
+                with open(req_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            requirements.append(line)
+            except Exception as e:
+                logger(f"Failed to read requirements from {req_path}: {e}")
+        return requirements
+
+    @staticmethod
+    def _extract_metadata(path: str, req_file: str | None = None) -> dict:
         """Parse component file for class metadata without importing."""
         meta: dict = {}
         try:
@@ -84,7 +99,13 @@ class ComponentManager:
                                                 elt.s if hasattr(elt, "s") else elt.value
                                             )
                                     meta[key] = reqs
-                        return meta
+                        break
+
+        # Append requirements.txt content if provided
+        if req_file:
+            meta.setdefault("requirements", [])
+            meta["requirements"] += ComponentManager._read_requirements_file(req_file)
+
         return meta
 
     def load_config(self):
@@ -105,13 +126,18 @@ class ComponentManager:
             return
         package_name = self.components_dir.replace(os.sep, ".")
         # Discover regular modules and packages first
-        for _, name, _ in pkgutil.iter_modules([self.components_dir]):
-            module_path = os.path.join(self.components_dir, f"{name}.py")
+        for _, name, ispkg in pkgutil.iter_modules([self.components_dir]):
+            if ispkg:
+                module_path = os.path.join(self.components_dir, name, "__init__.py")
+                req_path = os.path.join(self.components_dir, name, "requirements.txt")
+            else:
+                module_path = os.path.join(self.components_dir, f"{name}.py")
+                req_path = None
             try:
                 module = importlib.import_module(f"{package_name}.{name}")
             except Exception as e:
                 logger(f"Failed to import module {name}: {e}")
-                meta = self._extract_metadata(module_path)
+                meta = self._extract_metadata(module_path, req_path)
                 if meta.get("name"):
                     comp = PlaceholderComponent(
                         meta.get("name", name),
@@ -147,7 +173,8 @@ class ComponentManager:
                     spec.loader.exec_module(module)
                 except Exception as e:
                     logger(f"Failed to import module {entry.name} from main.py: {e}")
-                    meta = self._extract_metadata(main_py)
+                    req_file = os.path.join(entry.path, "requirements.txt")
+                    meta = self._extract_metadata(main_py, req_file)
                     if meta.get("name"):
                         comp = PlaceholderComponent(
                             meta.get("name", entry.name),
