@@ -65,7 +65,7 @@ def render_component_center():
             checked = original_enabled and can_enable
             
         # 根据当前toggle状态设置颜色
-        if checked and can_enable:
+        if checked:
             title_color = "#ffffff"  # 启用时使用白色
             desc_color = "#ffffff"   # 启用时使用白色
             if name not in current_enabled:
