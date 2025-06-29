@@ -137,14 +137,20 @@ class ComponentManager:
                 module = importlib.import_module(f"{package_name}.{name}")
             except Exception as e:
                 logger(f"Failed to import module {name}: {e}")
-                meta = self._extract_metadata(module_path, req_path)
-                if meta.get("name"):
-                    comp = PlaceholderComponent(
-                        meta.get("name", name),
-                        meta.get("description", ""),
-                        meta.get("requirements", []),
-                    )
-                    self.available[comp.name] = comp
+                meta = (
+                    self._extract_metadata(module_path, req_path)
+                    if os.path.isfile(module_path)
+                    else {}
+                )
+                reqs = meta.get("requirements")
+                if reqs is None and req_path:
+                    reqs = self._read_requirements_file(req_path)
+                comp = PlaceholderComponent(
+                    meta.get("name", name),
+                    meta.get("description", ""),
+                    reqs or [],
+                )
+                self.available[comp.name] = comp
                 continue
 
             if hasattr(module, "get_component"):
@@ -174,14 +180,20 @@ class ComponentManager:
                 except Exception as e:
                     logger(f"Failed to import module {entry.name} from main.py: {e}")
                     req_file = os.path.join(entry.path, "requirements.txt")
-                    meta = self._extract_metadata(main_py, req_file)
-                    if meta.get("name"):
-                        comp = PlaceholderComponent(
-                            meta.get("name", entry.name),
-                            meta.get("description", ""),
-                            meta.get("requirements", []),
-                        )
-                        self.available[comp.name] = comp
+                    meta = (
+                        self._extract_metadata(main_py, req_file)
+                        if os.path.isfile(main_py)
+                        else {}
+                    )
+                    reqs = meta.get("requirements")
+                    if reqs is None:
+                        reqs = self._read_requirements_file(req_file)
+                    comp = PlaceholderComponent(
+                        meta.get("name", entry.name),
+                        meta.get("description", ""),
+                        reqs or [],
+                    )
+                    self.available[comp.name] = comp
                     continue
 
                 if hasattr(module, "get_component"):
