@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 import time
+import uuid
 
 ARTIFACTS_DIR = "artifacts"
 ARTIFACTS_FILE = os.path.join(ARTIFACTS_DIR, "artifacts.json")
