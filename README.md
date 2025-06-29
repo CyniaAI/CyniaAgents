@@ -23,7 +23,7 @@ The repository ships with only a simple example component.  Complex generators s
 3. Configure your API keys and choose an LLM provider from the **Configuration Center** page in the sidebar.
 4. Download a component and place it in the `components` folder.
    Use the **Component Center** to enable or disable installed components.
-   Components may declare additional Python packages they depend on. The component developer are expected to instruct users to install these dependencies, commonly in the component's README.
+   Components may declare additional Python packages they depend on. Single-file components list them in a ``requirements`` attribute while multi-file components ship a ``requirements.txt`` file in their directory.
    If a component fails to load because dependencies are missing it still appears in the Component Center. Use the **Install requirements** button and restart the Streamlit server to activate it.
 5. Browse generated files in the **Artifact Center**.
 
@@ -47,7 +47,7 @@ class MyComponent(BaseComponent):
 ```
 
 See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for information on building your own generators.
-Components can be a single Python file or a folder containing multiple files.
+Components can be a single Python file or a folder containing multiple files. Single-file components keep their dependencies in a ``requirements`` list while multi-file components include a ``requirements.txt`` file.
 
 
 ## License

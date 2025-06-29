@@ -30,7 +30,9 @@ For larger components that span multiple files, create a folder inside
 entry point.
 
 After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page.
-Declare additional libraries in a ``requirements`` list on your component class.
+
+For single-file components, declare any extra libraries in a ``requirements`` list on your component class.  Larger components that live inside a directory should instead provide a ``requirements.txt`` file in that folder.  This allows the framework to statically read missing dependencies even if the module fails to import.
+
 Missing packages can be installed directly from the Component Center via the
 **Install requirements** button. Components that fail to load because their
 dependencies are missing still appear in the list but remain inactive until the
