@@ -33,11 +33,6 @@ After restarting the UI you can enable the component from the **Component Center
 
 For single-file components, declare any extra libraries in a ``requirements`` list on your component class.  Larger components that live inside a directory should instead provide a ``requirements.txt`` file in that folder.  This allows the framework to statically read missing dependencies even if the module fails to import.
 
-Missing packages can be installed directly from the Component Center via the
-**Install requirements** button. Components that fail to load because their
-dependencies are missing still appear in the list but remain inactive until the
-requirements are installed and the Streamlit service is restarted.
-
 ## Adding Configuration Items
 
 Components can expose custom configuration values which are stored in the project's `.env` file. Use `config.register_config_item()` to define a new key, description and input type:

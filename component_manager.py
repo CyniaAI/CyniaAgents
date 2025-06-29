@@ -4,7 +4,6 @@ import ast
 import json
 import os
 import pkgutil
-import subprocess
 import sys
 
 from log_writer import logger
@@ -31,18 +30,6 @@ class ComponentManager:
             except ImportError:
                 missing.append(req)
         return missing
-
-    @staticmethod
-    def install_requirements(requirements: list[str]) -> bool:
-        """Install packages via pip. Return True if successful."""
-        if not requirements:
-            return True
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", *requirements])
-            return True
-        except Exception as e:
-            logger(f"Failed to install requirements {requirements}: {e}")
-            return False
 
     @staticmethod
     def _read_requirements_file(req_path: str) -> list[str]:
