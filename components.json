@@ -1,6 +1,5 @@
 {
   "enabled": [
-    "Echo Agent",
-    "BuilderGPT"
+    "Echo Agent"
   ]
 }
