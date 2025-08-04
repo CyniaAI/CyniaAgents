@@ -4,9 +4,13 @@ __pycache__
 /logs
 test.py
 _config.yaml
+/generated
+/artifacts
 /codes
-/dev
 test.txt
 /test
+/.vscode
+/.kiro
 
 .env
+conponents.json

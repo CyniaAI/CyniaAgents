@@ -6,6 +6,12 @@ class BaseComponent:
     name = "Unnamed"
     description = ""
     requirements: list[str] = []
+    
+    # Version information
+    version = "1.0.0"
+    supported_framework_versions = None  # None means all versions supported
+    author_name = ""
+    author_link = ""
 
     def __init__(self) -> None:
         # Provide a logger instance for all components
@@ -24,20 +30,30 @@ def get_component():
 class PlaceholderComponent(BaseComponent):
     """Component shown when the real module failed to load."""
 
-    def __init__(self, name: str, description: str, requirements: list[str]):
+    def __init__(self, name: str, description: str, requirements: list[str], error_type: str = "dependencies"):
         super().__init__()
         self.name = name
         self.description = description
         self.requirements = requirements
+        self.error_type = error_type  # "dependencies" or "version"
 
     def render(self):
         import streamlit as st
 
-        st.error(
-            "This component could not be loaded because required libraries are missing."
-        )
-        if self.requirements:
-            st.info(
-                "Install the missing dependencies from the Component Center and restart the service to activate this component."
+        if self.error_type == "version" or "[Version Incompatible]" in self.description:
+            st.error(
+                "This component could not be loaded because it is not compatible with the current framework version."
             )
+            st.info(
+                "You can enable FORCE_LOAD_UNSUPPORTED_COMPONENT in the configuration to force load this component, "
+                "but it may not work correctly."
+            )
+        else:
+            st.error(
+                "This component could not be loaded because required libraries are missing."
+            )
+            if self.requirements:
+                st.info(
+                    "Install the missing dependencies from the Component Center and restart the service to activate this component."
+                )
 

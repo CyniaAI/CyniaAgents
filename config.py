@@ -21,6 +21,19 @@ CONFIG_ITEMS = {
     "BASE_URL": {"description": "Base URL for the API provider"},
     "GENERATION_MODEL": {"description": "Model used for generation"},
     "FIXING_MODEL": {"description": "Model used for fixing"},
+    "VERSION_NUMBER": {"description": "Framework version number"},
+    "FORCE_DISABLE_VERSION_NUMBER_COVERING": {
+        "description": "Disable automatic version number covering from .env.example",
+        "type": "select",
+        "options": ["false", "true"],
+        "default": "false"
+    },
+    "FORCE_LOAD_UNSUPPORTED_COMPONENT": {
+        "description": "Force load components that don't support current framework version",
+        "type": "select", 
+        "options": ["false", "true"],
+        "default": "false"
+    },
 }
 
 
@@ -42,6 +55,9 @@ def load_config():
 
     # Load environment variables from .env file
     load_dotenv()
+    
+    # Handle version number covering from .env.example
+    _handle_version_number_covering()
     
     # Load configuration from .env file
     for key, meta in CONFIG_ITEMS.items():
@@ -169,7 +185,7 @@ def register_config_item(
     description: str,
     default: str = "",
     input_type: str = "text",
-    options: list | None = None,
+    options = None,
 ) -> None:
     """Register a new configuration item.
 
@@ -193,6 +209,72 @@ def register_config_item(
         CONFIG_ITEMS[key]["default"] = default
     value = os.getenv(key, default)
     globals()[key] = value
+
+
+def _handle_version_number_covering():
+    """
+    Handle version number covering from .env.example to .env.
+    This ensures users get the latest version number even if they don't update their .env file.
+    """
+    # Check if version covering is disabled
+    force_disable = os.getenv('FORCE_DISABLE_VERSION_NUMBER_COVERING', 'false').lower() == 'true'
+    if force_disable:
+        logger("Version number covering is disabled by FORCE_DISABLE_VERSION_NUMBER_COVERING")
+        return
+    
+    # Read version from .env.example
+    example_version = None
+    if os.path.exists('.env.example'):
+        try:
+            with open('.env.example', 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('VERSION_NUMBER='):
+                        example_version = line.split('=', 1)[1].strip()
+                        break
+        except Exception as e:
+            logger(f"Failed to read version from .env.example: {e}")
+            return
+    
+    if not example_version:
+        logger("No VERSION_NUMBER found in .env.example")
+        return
+    
+    # Read current .env file
+    env_lines = []
+    current_version = None
+    version_line_index = -1
+    
+    try:
+        with open('.env', 'r', encoding='utf-8') as f:
+            env_lines = f.readlines()
+    except FileNotFoundError:
+        logger(".env file not found, cannot update version")
+        return
+    
+    # Find current version in .env
+    for i, line in enumerate(env_lines):
+        if line.strip().startswith('VERSION_NUMBER='):
+            current_version = line.strip().split('=', 1)[1].strip()
+            version_line_index = i
+            break
+    
+    # Update version if different
+    if current_version != example_version:
+        if version_line_index >= 0:
+            # Update existing line
+            env_lines[version_line_index] = f"VERSION_NUMBER={example_version}\n"
+        else:
+            # Add new line
+            env_lines.append(f"VERSION_NUMBER={example_version}\n")
+        
+        # Write back to .env
+        try:
+            with open('.env', 'w', encoding='utf-8') as f:
+                f.writelines(env_lines)
+            logger(f"Updated VERSION_NUMBER from {current_version} to {example_version}")
+        except Exception as e:
+            logger(f"Failed to update .env file: {e}")
 
 
 load_config()
