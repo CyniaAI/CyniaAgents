@@ -5,6 +5,7 @@ import config
 import utils
 from component_manager import ComponentManager
 import artifact_manager
+from ui_components import DependencyInstallationUI, ZipImportUI, ComponentManagementUI, RealTimeStatusUI
 
 
 utils.initialize()
@@ -12,6 +13,12 @@ utils.initialize()
 st.set_page_config(page_title="Cynia Agents", page_icon="🧩")
 
 manager = ComponentManager()
+
+# Initialize UI components
+dependency_ui = DependencyInstallationUI(manager)
+zip_import_ui = ZipImportUI(manager)
+component_mgmt_ui = ComponentManagementUI(manager)
+status_ui = RealTimeStatusUI(manager)
 
 
 def render_artifact_center():
@@ -34,116 +41,65 @@ def render_artifact_center():
 
 
 def render_component_center():
-    """UI for enabling/disabling components."""
+    """Enhanced UI for component management with hot reload functionality."""
     st.header("🧩 Component Center")
-    st.markdown("Manage your components here. Enable or disable components as needed.")
+    st.markdown("Manage your components with hot reload, dependency installation, and ZIP import capabilities.")
     
-    if not manager.available:
-        st.info("No components found. Please add components to the components directory.")
-        return
+    # Create tabs for different functionalities
+    tab1, tab2, tab3, tab4 = st.tabs(["📦 Components", "🔧 Dependencies", "📁 Import ZIP", "📊 Status"])
     
-    # 检查是否有未保存的更改
-    has_unsaved_changes = False
-    current_enabled = []
-    
-    # 逐个显示组件卡片，每个卡片占满一行
-    for name, comp in manager.available.items():
-        original_enabled = name in manager.enabled
+    with tab1:
+        # Component management with enhanced controls
+        st.subheader("Component Management")
         
-        # 检查是否有缺失的依赖
-        missing = manager.missing_requirements(getattr(comp, "requirements", []))
-        has_missing_deps = bool(missing)
-        
-        # 如果有缺失依赖，则不能启用组件
-        can_enable = not has_missing_deps
-        
-        # 先获取toggle状态来确定颜色
-        toggle_key = f"toggle_{name}"
-        if toggle_key in st.session_state:
-            checked = st.session_state[toggle_key] and can_enable
-        else:
-            checked = original_enabled and can_enable
+        if not manager.available:
+            st.info("No components found. Please add components to the components directory.")
             
-        # 根据当前toggle状态设置颜色
-        if checked:
-            title_color = "#ffffff"  # 启用时使用白色
-            desc_color = "#ffffff"   # 启用时使用白色
-            if name not in current_enabled:
-                current_enabled.append(name)
-        else:
-            title_color = "#999999"  # 禁用时使用灰色
-            desc_color = "#cccccc"   # 禁用时使用浅灰色
+            # Show ZIP import option when no components
+            st.markdown("---")
+            st.markdown("**Get started by importing a component:**")
+            zip_import_ui.render_zip_import_interface()
+            return
         
-        # 渲染带有内嵌toggle的卡片
-        st.markdown(f"""
-            <div style="
-                border-radius: 12px;
-                padding: 20px;
-                margin: 15px 0;
-                background: transparent;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-                transition: all 0.3s ease;
-            ">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="flex: 1;">
-                        <h3 style="margin: 0 0 8px 0; font-weight: 600; color: {title_color};">{name}</h3>
-                        <p style="margin: 0; font-size: 14px; line-height: 1.5; color: {desc_color};">
-                            {comp.description or 'No description available'}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        # Render enhanced component cards
+        for name, comp in manager.available.items():
+            component_mgmt_ui.render_component_card(name, comp)
         
-        # 在卡片渲染后立即添加依赖信息和toggle，让它看起来在卡片内部
-        col1, col2 = st.columns([6, 1])
-        
-        with col1:
-            if has_missing_deps:
-                st.error(f"⚠️ Missing dependencies: {', '.join(missing)}")
-                st.info(f"📋 Install command: `pip install {' '.join(missing)}`")
-                st.warning("Please install the missing dependencies and restart the Streamlit service.")
-        
+        # Save configuration section
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            # 使用负的margin让toggle看起来在卡片内部
-            st.markdown("""
-                <style>
-                .stToggle {
-                    margin-top: -80px !important;
-                    margin-right: 10px !important;
-                }
-                </style>
-                """, unsafe_allow_html=True)
-
-            # 如果有缺失依赖，禁用toggle
-            if has_missing_deps:
-                st.toggle(f"Enable", value=False, key=f"toggle_{name}", disabled=True, 
-                         help="Cannot enable: missing dependencies")
-            else:
-                checked = st.toggle(f"Enable", value=original_enabled, key=f"toggle_{name}")
-                
-                if checked and name not in current_enabled:
-                    current_enabled.append(name)
-                
-                # 检查是否有变化
-                if checked != original_enabled:
-                    has_unsaved_changes = True
+            if st.button("💾 Save Configuration", type="primary"):
+                manager.save_config()
+                st.success("✅ Configuration saved successfully!")
+                st.rerun()
     
-    # 显示未保存更改提示
-    if has_unsaved_changes:
-        st.warning("⚠️ You have unsaved changes. Please save configuration to apply changes.")
+    with tab2:
+        # Dependency management interface
+        st.subheader("Dependency Management")
+        
+        if not manager.available:
+            st.info("No components available for dependency management.")
+            return
+        
+        # Component selector for dependency management
+        component_names = list(manager.available.keys())
+        selected_component = st.selectbox(
+            "Select component for dependency management:",
+            component_names,
+            key="dep_component_selector"
+        )
+        
+        if selected_component:
+            dependency_ui.render_dependency_installation_interface(selected_component)
     
-    # 保存配置按钮
-    st.markdown("---")
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        if st.button("💾 Save Configuration", type="primary"):
-            # 更新manager的enabled列表
-            manager.enabled = current_enabled.copy()
-            manager.save_config()
-            st.success("✅ Configuration saved successfully!")
-            # 自动刷新页面
-            st.rerun()
+    with tab3:
+        # ZIP import interface
+        zip_import_ui.render_zip_import_interface()
+    
+    with tab4:
+        # Real-time status dashboard
+        status_ui.render_status_dashboard()
 
 
 def render_config_center():

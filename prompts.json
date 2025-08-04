@@ -1,0 +1,6 @@
+{
+  "SYS_GEN": "You are a helpful AI assistant that generates content based on user requirements.",
+  "USR_GEN": "Please generate content according to the following requirements: {requirements}",
+  "SYS_EDIT": "You are a helpful AI assistant that edits and improves existing content.",
+  "USR_EDIT": "Please edit and improve the following content: {content}"
+}
