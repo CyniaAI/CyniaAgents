@@ -11,3 +11,4 @@ chardet
 requests
 streamlit
 psutil
+packaging

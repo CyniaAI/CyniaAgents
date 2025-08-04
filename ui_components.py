@@ -581,11 +581,39 @@ class ComponentManagementUI:
                 status_text = status.value.replace('_', ' ').title()
                 st.caption(f"Status: {status_text}")
                 
+                # Component version info
+                comp_version = getattr(component, 'version', '1.0.0')
+                st.caption(f"Version: {comp_version}")
+                
+                # Author info
+                author_name = getattr(component, 'author_name', '')
+                author_link = getattr(component, 'author_link', '')
+                if author_name:
+                    if author_link:
+                        st.caption(f"Author: [{author_name}]({author_link})")
+                    else:
+                        st.caption(f"Author: {author_name}")
+                
+                # Framework version compatibility
+                supported_versions = getattr(component, 'supported_framework_versions', None)
+                if supported_versions is not None:
+                    from version_checker import VersionChecker
+                    import config
+                    framework_version = getattr(config, 'VERSION_NUMBER', '1.0.0')
+                    is_compatible = VersionChecker.is_version_supported(supported_versions, framework_version)
+                    
+                    if is_compatible:
+                        st.caption("✅ Compatible with current framework")
+                    else:
+                        st.caption("⚠️ Version incompatible")
+                        version_set = VersionChecker.parse_supported_versions(supported_versions)
+                        st.caption(f"Requires: {version_set}")
+                
                 if metadata:
-                    if metadata.version:
-                        st.caption(f"Version: {metadata.version}")
-                    if metadata.author:
-                        st.caption(f"Author: {metadata.author}")
+                    if metadata.version and metadata.version != comp_version:
+                        st.caption(f"Metadata Version: {metadata.version}")
+                    if metadata.author and metadata.author != author_name:
+                        st.caption(f"Metadata Author: {metadata.author}")
             
             with col2:
                 # Component management controls

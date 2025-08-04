@@ -17,6 +17,8 @@ from hot_reload.dependency import DependencyManager
 from hot_reload.loader import ComponentLoader
 from hot_reload.models import ComponentStatus, ComponentMetadata, ReloadResult, InstallationResult
 from component_load_guard import start_loading_component, finish_loading_component, can_load_component, is_component_loading
+from version_checker import VersionChecker
+import config
 
 
 class ComponentManager:
@@ -86,7 +88,7 @@ class ComponentManager:
                                 and isinstance(stmt.targets[0], ast.Name)
                             ):
                                 key = stmt.targets[0].id
-                                if key in {"name", "description"} and isinstance(
+                                if key in {"name", "description", "version", "author_name", "author_link"} and isinstance(
                                     stmt.value, (ast.Str, ast.Constant)
                                 ):
                                     meta[key] = (
@@ -104,6 +106,9 @@ class ComponentManager:
                                                 elt.s if hasattr(elt, "s") else elt.value
                                             )
                                     meta[key] = reqs
+                                elif key == "supported_framework_versions":
+                                    # Handle supported_framework_versions which can be various types
+                                    meta[key] = ComponentManager._extract_supported_versions(stmt.value)
                         break
 
         # Append requirements.txt content if provided
@@ -112,6 +117,81 @@ class ComponentManager:
             meta["requirements"] += ComponentManager._read_requirements_file(req_file)
 
         return meta
+
+    @staticmethod
+    def _extract_supported_versions(ast_node):
+        """Extract supported_framework_versions from AST node."""
+        try:
+            if isinstance(ast_node, ast.Constant):
+                # Handle None or string constants
+                return ast_node.value
+            elif isinstance(ast_node, (ast.Str,)):
+                # Handle string literals (older Python versions)
+                return ast_node.s
+            elif isinstance(ast_node, (ast.List, ast.Tuple)):
+                # Handle list/tuple of version specs
+                versions = []
+                for elt in ast_node.elts:
+                    if isinstance(elt, (ast.Str, ast.Constant)):
+                        versions.append(elt.s if hasattr(elt, "s") else elt.value)
+                    elif isinstance(elt, ast.Dict):
+                        # Handle dict elements like {"min_version": "1.0.0", "max_version": "2.0.0"}
+                        version_dict = {}
+                        for k, v in zip(elt.keys, elt.values):
+                            if isinstance(k, (ast.Str, ast.Constant)) and isinstance(v, (ast.Str, ast.Constant)):
+                                key = k.s if hasattr(k, "s") else k.value
+                                value = v.s if hasattr(v, "s") else v.value
+                                version_dict[key] = value
+                        versions.append(version_dict)
+                return versions
+            elif isinstance(ast_node, ast.Dict):
+                # Handle single dict like {"min_version": "1.0.0", "max_version": "2.0.0"}
+                version_dict = {}
+                for k, v in zip(ast_node.keys, ast_node.values):
+                    if isinstance(k, (ast.Str, ast.Constant)) and isinstance(v, (ast.Str, ast.Constant)):
+                        key = k.s if hasattr(k, "s") else k.value
+                        value = v.s if hasattr(v, "s") else v.value
+                        version_dict[key] = value
+                return version_dict
+            else:
+                return None
+        except Exception as e:
+            logger(f"Error extracting supported versions: {e}")
+            return None
+
+    def _check_version_compatibility(self, component_name: str, component_metadata: dict) -> bool:
+        """
+        Check if a component is compatible with the current framework version.
+        
+        Args:
+            component_name: Name of the component
+            component_metadata: Component metadata dictionary
+            
+        Returns:
+            bool: True if compatible or if force loading is enabled
+        """
+        # Check if force loading is enabled
+        force_load = getattr(config, 'FORCE_LOAD_UNSUPPORTED_COMPONENT', 'false').lower() == 'true'
+        if force_load:
+            logger(f"Force loading enabled, skipping version check for {component_name}")
+            return True
+        
+        # Get current framework version
+        framework_version = getattr(config, 'VERSION_NUMBER', '1.0.0')
+        
+        # Get component's supported versions
+        supported_versions = component_metadata.get('supported_framework_versions')
+        
+        # Check compatibility
+        is_compatible = VersionChecker.is_version_supported(supported_versions, framework_version)
+        
+        if not is_compatible:
+            compatibility_msg = VersionChecker.get_version_compatibility_message(
+                component_name, supported_versions, framework_version
+            )
+            logger(f"Version incompatibility: {compatibility_msg}")
+        
+        return is_compatible
 
     def load_config(self):
         if os.path.exists(self.config_path):
@@ -199,10 +279,34 @@ class ComponentManager:
                             try:
                                 comp = load_result.module.get_component()
                                 if isinstance(comp, BaseComponent):
-                                    self.available[comp.name] = comp
-                                    self.track_component_status(comp.name, ComponentStatus.LOADED, load_result.metadata)
-                                    logger(f"Successfully loaded component: {comp.name}")
-                                    finish_loading_component(component_name, True)
+                                    # Extract component metadata for version checking
+                                    comp_metadata = {
+                                        'name': getattr(comp, 'name', component_name),
+                                        'description': getattr(comp, 'description', ''),
+                                        'version': getattr(comp, 'version', '1.0.0'),
+                                        'supported_framework_versions': getattr(comp, 'supported_framework_versions', None),
+                                        'author_name': getattr(comp, 'author_name', ''),
+                                        'author_link': getattr(comp, 'author_link', ''),
+                                        'requirements': getattr(comp, 'requirements', [])
+                                    }
+                                    
+                                    # Check version compatibility
+                                    if self._check_version_compatibility(comp.name, comp_metadata):
+                                        self.available[comp.name] = comp
+                                        self.track_component_status(comp.name, ComponentStatus.LOADED, load_result.metadata)
+                                        logger(f"Successfully loaded component: {comp.name}")
+                                        finish_loading_component(component_name, True)
+                                    else:
+                                        # Create placeholder for incompatible component
+                                        logger(f"Component {comp.name} is not compatible with current framework version")
+                                        placeholder = PlaceholderComponent(
+                                            comp_metadata['name'],
+                                            f"[Version Incompatible] {comp_metadata['description']}",
+                                            comp_metadata['requirements']
+                                        )
+                                        self.available[comp.name] = placeholder
+                                        self.track_component_status(comp.name, ComponentStatus.FAILED)
+                                        finish_loading_component(component_name, False)
                                 else:
                                     logger(f"Component {component_name} does not inherit from BaseComponent")
                                     self.track_component_status(component_name, ComponentStatus.FAILED)
@@ -654,7 +758,7 @@ class ComponentManager:
         
         TEMPORARILY DISABLED to prevent infinite loops.
         """
-        logger("Dynamic component discovery is temporarily disabled to prevent infinite loops")
+        #logger("Dynamic component discovery is temporarily disabled to prevent infinite loops")
         return
         
         # Original code commented out to prevent infinite loops

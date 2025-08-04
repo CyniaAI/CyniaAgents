@@ -8,6 +8,15 @@ from component_base import BaseComponent
 class MyComponent(BaseComponent):
     name = "My Generator"
     description = "Does something amazing"
+    version = "1.0.0"  # Component version
+    
+    # Framework version compatibility (optional)
+    supported_framework_versions = ">=1.0.0"  # Support framework 1.0.0+
+    
+    # Author information (optional)
+    author_name = "Your Name"
+    author_link = "https://github.com/yourname"
+    
     # Declare any additional packages your component depends on
     requirements = ["pandas"]
 
@@ -32,6 +41,41 @@ entry point.
 After restarting the UI you can enable the component from the **Component Center** page in the sidebar. Once enabled it appears as its own page.
 
 For single-file components, declare any extra libraries in a ``requirements`` list on your component class.  Larger components that live inside a directory should instead provide a ``requirements.txt`` file in that folder.  This allows the framework to statically read missing dependencies even if the module fails to import.
+
+## Component Version Management
+
+Components support comprehensive version management to ensure compatibility and provide better user experience.
+
+### Framework Version Compatibility
+
+Specify which framework versions your component supports:
+
+```python
+class MyComponent(BaseComponent):
+    # Support all versions (default)
+    supported_framework_versions = None
+    
+    # Support framework 1.0.0 and above
+    supported_framework_versions = ">=1.0.0"
+    
+    # Support framework up to 2.0.0
+    supported_framework_versions = "<=2.0.0"
+    
+    # Support framework 1.0.0 to 2.0.0
+    supported_framework_versions = ">=1.0.0,<=2.0.0"
+    
+    # Support multiple version ranges
+    supported_framework_versions = [
+        {"min_version": "1.0.0", "max_version": "1.5.0"},  # 1.0.0-1.5.0
+        {"min_version": "2.0.0"}  # 2.0.0+
+    ]
+```
+
+### Version Compatibility Behavior
+
+- **Compatible components**: Load normally and appear in Component Center
+- **Incompatible components**: Show as placeholder with version warning
+- **Force loading**: Set `FORCE_LOAD_UNSUPPORTED_COMPONENT=true` in `.env` to bypass checks
 
 ## Adding Configuration Items
 
