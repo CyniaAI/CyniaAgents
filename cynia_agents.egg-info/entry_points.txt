@@ -1,0 +1,2 @@
+[console_scripts]
+cynia-agents = cynia_cli:main

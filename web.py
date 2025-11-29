@@ -5,7 +5,7 @@ import config
 import utils
 from component_manager import ComponentManager
 import artifact_manager
-from ui_components import DependencyInstallationUI, ZipImportUI, ComponentManagementUI, RealTimeStatusUI
+from ui_components import DependencyInstallationUI, ZipImportUI, ComponentManagementUI, RealTimeStatusUI, FolderImportUI
 
 
 utils.initialize()
@@ -17,6 +17,7 @@ manager = ComponentManager()
 # Initialize UI components
 dependency_ui = DependencyInstallationUI(manager)
 zip_import_ui = ZipImportUI(manager)
+folder_import_ui = FolderImportUI(manager)
 component_mgmt_ui = ComponentManagementUI(manager)
 status_ui = RealTimeStatusUI(manager)
 
@@ -46,11 +47,17 @@ def render_component_center():
     st.markdown("Manage your components with hot reload, dependency installation, and ZIP import capabilities.")
     
     # Create tabs for different functionalities
-    tab1, tab2, tab3, tab4 = st.tabs(["📦 Components", "🔧 Dependencies", "📁 Import ZIP", "📊 Status"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📦 Components", "🔧 Dependencies", "📁 Import ZIP", "📂 Import Folder", "📊 Status"])
     
     with tab1:
         # Component management with enhanced controls
-        st.subheader("Component Management")
+        col_header, col_refresh = st.columns([3, 1])
+        with col_header:
+            st.subheader("Component Management")
+        with col_refresh:
+            if st.button("🔄 Refresh Components"):
+                manager.discover_components()
+                st.rerun()
         
         if not manager.available:
             st.info("No components found. Please add components to the components directory.")
@@ -59,20 +66,19 @@ def render_component_center():
             st.markdown("---")
             st.markdown("**Get started by importing a component:**")
             zip_import_ui.render_zip_import_interface()
-            return
-        
-        # Render enhanced component cards
-        for name, comp in manager.available.items():
-            component_mgmt_ui.render_component_card(name, comp)
-        
-        # Save configuration section
-        st.markdown("---")
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("💾 Save Configuration", type="primary"):
-                manager.save_config()
-                st.success("✅ Configuration saved successfully!")
-                st.rerun()
+        else:
+            # Render enhanced component cards
+            for name, comp in manager.available.items():
+                component_mgmt_ui.render_component_card(name, comp)
+            
+            # Save configuration section
+            st.markdown("---")
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col2:
+                if st.button("💾 Save Configuration", type="primary"):
+                    manager.save_config()
+                    st.success("✅ Configuration saved successfully!")
+                    st.rerun()
     
     with tab2:
         # Dependency management interface
@@ -80,24 +86,27 @@ def render_component_center():
         
         if not manager.available:
             st.info("No components available for dependency management.")
-            return
-        
-        # Component selector for dependency management
-        component_names = list(manager.available.keys())
-        selected_component = st.selectbox(
-            "Select component for dependency management:",
-            component_names,
-            key="dep_component_selector"
-        )
-        
-        if selected_component:
-            dependency_ui.render_dependency_installation_interface(selected_component)
+        else:
+            # Component selector for dependency management
+            component_names = list(manager.available.keys())
+            selected_component = st.selectbox(
+                "Select component for dependency management:",
+                component_names,
+                key="dep_component_selector"
+            )
+            
+            if selected_component:
+                dependency_ui.render_dependency_installation_interface(selected_component)
     
     with tab3:
         # ZIP import interface
         zip_import_ui.render_zip_import_interface()
     
     with tab4:
+        # Folder import interface
+        folder_import_ui.render_folder_import_interface()
+
+    with tab5:
         # Real-time status dashboard
         status_ui.render_status_dashboard()
 

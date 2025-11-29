@@ -11,6 +11,14 @@ artifact_manager.register_artifact_type("text")
 class ExampleComponent(BaseComponent):
     name = "Echo Agent"
     description = "Demo agent that sends your prompt to the LLM and displays the response."
+    version = "1.0.0"
+    
+    supported_framework_versions = ">=1.0.0"
+    
+    # Author information (optional)
+    author_name = "Zhou-Shilin"
+    author_link = "https://github.com/Zhou-Shilin"
+
     requirements: list[str] = []
 
     def __init__(self):

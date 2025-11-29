@@ -1,0 +1,11 @@
+streamlit
+watchdog
+python-dotenv
+chardet
+requests
+psutil
+packaging
+langchain
+langchain-openai
+langchain-google-genai
+langchain-anthropic

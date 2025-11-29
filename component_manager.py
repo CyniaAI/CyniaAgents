@@ -1,4 +1,5 @@
 import importlib
+import shutil
 import importlib.util
 import ast
 import json
@@ -23,7 +24,13 @@ import config
 
 class ComponentManager:
     def __init__(self, components_dir="components", config_path="components.json"):
-        self.components_dir = components_dir
+        # Resolve components_dir relative to this file's directory (package root)
+        if not os.path.isabs(components_dir):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            self.components_dir = os.path.join(base_dir, components_dir)
+        else:
+            self.components_dir = components_dir
+            
         self.config_path = config_path
         self.available = {}
         self.enabled = []
@@ -224,7 +231,13 @@ class ComponentManager:
             # Get list of available components from the component loader
             available_components = self.component_loader.list_available_components()
             
-            package_name = self.components_dir.replace(os.sep, ".")
+            # Ensure the parent directory of components_dir is in sys.path
+            parent_dir = os.path.dirname(self.components_dir)
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+            
+            # The package name should be the directory name of components_dir
+            package_name = os.path.basename(self.components_dir)
             
             # Process each available component
             for component_name in available_components:
@@ -363,7 +376,7 @@ class ComponentManager:
             
             # Set up file watching for dynamic discovery if not already set up
             if not hasattr(self, '_file_watcher_setup'):
-                self._setup_dynamic_discovery()
+                # self._setup_dynamic_discovery()
                 self._file_watcher_setup = True
         finally:
             self._discovery_in_progress = False
@@ -376,7 +389,12 @@ class ComponentManager:
         if not os.path.isdir(self.components_dir):
             return
             
-        package_name = self.components_dir.replace(os.sep, ".")
+        # Ensure the parent directory of components_dir is in sys.path
+        parent_dir = os.path.dirname(self.components_dir)
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+            
+        package_name = os.path.basename(self.components_dir)
         
         # Discover regular modules and packages first
         for _, name, ispkg in pkgutil.iter_modules([self.components_dir]):
@@ -657,6 +675,66 @@ class ComponentManager:
                 success=False,
                 error_message=error_msg
             )
+
+    def import_component_from_folder(self, source_path: str) -> InstallationResult:
+        """
+        Import a component from a local folder.
+        
+        Args:
+            source_path: Path to the component folder
+            
+        Returns:
+            InstallationResult: Result of the import operation
+        """
+        try:
+            if not os.path.exists(source_path):
+                return InstallationResult(
+                    component_name=os.path.basename(source_path),
+                    dependencies=[],
+                    success=False,
+                    error_message=f"Source path does not exist: {source_path}"
+                )
+            
+            if not os.path.isdir(source_path):
+                return InstallationResult(
+                    component_name=os.path.basename(source_path),
+                    dependencies=[],
+                    success=False,
+                    error_message=f"Source path is not a directory: {source_path}"
+                )
+                
+            component_name = os.path.basename(source_path)
+            target_path = os.path.join(self.components_dir, component_name)
+            
+            if os.path.exists(target_path):
+                return InstallationResult(
+                    component_name=component_name,
+                    dependencies=[],
+                    success=False,
+                    error_message=f"Component {component_name} already exists"
+                )
+            
+            # Copy the folder
+            shutil.copytree(source_path, target_path)
+            
+            # Trigger discovery
+            self.discover_components()
+            
+            return InstallationResult(
+                component_name=component_name,
+                dependencies=[],
+                success=True,
+                error_message=""
+            )
+            
+        except Exception as e:
+            return InstallationResult(
+                component_name=os.path.basename(source_path),
+                dependencies=[],
+                success=False,
+                error_message=f"Failed to import component: {str(e)}"
+            )
+
     
     def get_component_status(self, component_name: str) -> ComponentStatus:
         """

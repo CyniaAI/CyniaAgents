@@ -1,6 +1,6 @@
+from typing import Union, Optional, List, Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 import chardet
 import sys
@@ -9,6 +9,7 @@ import locale
 import os
 import base64
 import mimetypes
+import requests
 
 from log_writer import logger
 import config
@@ -19,7 +20,7 @@ def _create_client(provider: str, api_key: str, base_url: str, model_name: str):
     if provider == "anthropic":
         return ChatAnthropic(api_key=api_key, model_name=model_name, max_tokens=10000)
     if provider == "google":
-        return ChatGoogleGenerativeAI(
+        return _GoogleGenerativeAIClient(
             google_api_key=api_key,
             model=model_name,
             max_output_tokens=10000,
@@ -49,6 +50,171 @@ def _image_to_data_url(path: str) -> str:
     return f"data:{mime};base64,{b64}"
 
 
+class _GoogleGenerativeAIResponse:
+    """Lightweight response wrapper mimicking LangChain's .content attribute."""
+
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+
+class _GoogleGenerativeAIClient:
+    """Minimal Google Gemini chat client without the LangChain dependency."""
+
+    API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
+
+    def __init__(
+        self,
+        google_api_key: str,
+        model: str,
+        max_output_tokens: int = 10000,
+    ) -> None:
+        self.api_key = google_api_key
+        self.model = model
+        self.max_output_tokens = max_output_tokens
+        self.session = requests.Session()
+
+    def invoke(self, messages: List[Union[HumanMessage, SystemMessage, AIMessage]]):
+        payload = self._build_payload(messages)
+        url = f"{self.API_ROOT}/models/{self.model}:generateContent"
+        logger(f"google invoke: payload {payload}")
+        try:
+            response = self.session.post(
+                url,
+                params={"key": self.api_key},
+                json=payload,
+                timeout=60,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            logger(f"google invoke: transport error {exc}")
+            raise Exception(
+                "Failed to connect to Google Gemini. Check your API key and network."
+            ) from exc
+
+        data = response.json()
+        logger(f"google invoke: raw response {data}")
+        if "error" in data:
+            message = data["error"].get("message", "Unknown Google Gemini error")
+            raise Exception(f"Google Gemini error: {message}")
+
+        try:
+            text = self._extract_text(data)
+        except Exception as exc:
+            raise Exception(
+                "Google Gemini response was missing text. Enable verbose logging for details."
+            ) from exc
+
+        return _GoogleGenerativeAIResponse(text)
+
+    def _build_payload(
+        self, messages: List[Union[HumanMessage, SystemMessage, AIMessage]]
+    ) -> dict:
+        contents: List[dict] = []
+        system_instruction: Optional[dict] = None
+
+        for message in messages:
+            if isinstance(message, SystemMessage):
+                if system_instruction is None:
+                    system_instruction = {
+                        "role": "system",
+                        "parts": self._to_parts(message.content),
+                    }
+                    continue
+                # Subsequent system messages are treated as normal user text.
+                role = "user"
+            elif isinstance(message, AIMessage):
+                role = "model"
+            else:
+                role = "user"
+
+            contents.append({"role": role, "parts": self._to_parts(message.content)})
+
+        payload: dict = {
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": self.max_output_tokens,
+            },
+        }
+        if system_instruction:
+            payload["system_instruction"] = system_instruction
+        return payload
+
+    def _to_parts(self, content) -> list[dict]:
+        if isinstance(content, str):
+            structured = self._try_parse_structured_content(content)
+            if structured is not None:
+                return self._structured_to_parts(structured)
+            return [{"text": content}]
+        if isinstance(content, list):
+            return self._structured_to_parts(content)
+        if isinstance(content, dict):
+            return self._structured_to_parts([content])
+        return [{"text": str(content)}]
+
+    def _try_parse_structured_content(self, content: str):
+        try:
+            parsed = json.loads(content)
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if isinstance(parsed, (list, dict)):
+            return parsed
+        return None
+
+    def _structured_to_parts(self, payload) -> list[dict]:
+        items = payload if isinstance(payload, list) else [payload]
+        parts: list[dict] = []
+        for item in items:
+            if not isinstance(item, dict):
+                parts.append({"text": str(item)})
+                continue
+            part_type = item.get("type", "text")
+            if part_type == "text":
+                parts.append({"text": item.get("text", "")})
+            elif part_type == "image_url":
+                image_part = self._image_part_from_url(item.get("image_url", {}))
+                if image_part:
+                    parts.append(image_part)
+            elif part_type == "input_text":
+                parts.append({"text": item.get("text", "")})
+            else:
+                parts.append({"text": json.dumps(item)})
+        return parts or [{"text": ""}]
+
+    def _image_part_from_url(self, payload: dict) -> Optional[dict]:
+        url = payload.get("url") if isinstance(payload, dict) else None
+        if not url:
+            return None
+        if url.startswith("data:"):
+            try:
+                header, b64_data = url.split(",", 1)
+            except ValueError:
+                return None
+            mime = "image/png"
+            if ";base64" in header:
+                mime = header.split("data:", 1)[-1].split(";base64", 1)[0] or mime
+            return {
+                "inline_data": {
+                    "mime_type": mime,
+                    "data": b64_data,
+                }
+            }
+        # Fallback to remote URI reference. Gemini expects Google storage URIs but
+        # allowing HTTPS keeps parity with the OpenAI format users already employ.
+        return {"file_data": {"file_uri": url}}
+
+    def _extract_text(self, data: dict) -> str:
+        candidates = data.get("candidates") or []
+        texts: list[str] = []
+        for candidate in candidates:
+            parts = candidate.get("content", {}).get("parts", [])
+            for part in parts:
+                if "text" in part:
+                    texts.append(part["text"])
+        if not texts:
+            raise ValueError("No text parts in Gemini response.")
+        return "".join(texts)
+
+
 def initialize() -> None:
     """
     Initializes the software.
@@ -73,10 +239,10 @@ class LLM:
 
     def __init__(
         self,
-        provider: str | None = None,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        model_name: str | None = None,
+        provider: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model_name: Optional[str] = None,
     ) -> None:
         self.provider = (provider or getattr(config, "LLM_PROVIDER", "openai")).lower()
         self.api_key = api_key or config.API_KEY
@@ -95,7 +261,7 @@ class LLM:
 
         return Conversation(self, system_prompt)
 
-    def _get_client(self, model_name: str | None = None):
+    def _get_client(self, model_name: Optional[str] = None):
         if model_name and model_name != self.model_name:
             return _create_client(
                 self.provider, self.api_key, self.base_url, model_name
@@ -106,8 +272,8 @@ class LLM:
         self,
         system_prompt: str,
         user_prompt: str,
-        image_path: str | None = None,
-        model_name: str | None = None,
+        image_path: Optional[str] = None,
+        model_name: Optional[str] = None,
     ) -> str:
         """Single-turn conversation returning the assistant reply as text.
 
@@ -127,7 +293,7 @@ class LLM:
                 {"type": "text", "text": user_prompt},
                 {"type": "image_url", "image_url": {"url": image_url}},
             ]
-            user_message = HumanMessage(content=json.dumps(user_content))
+            user_message = HumanMessage(content=user_content)
         else:
             user_message = HumanMessage(content=user_prompt)
 
@@ -179,7 +345,7 @@ class LLM:
         return assistant_reply
 
     def _conversation(
-        self, messages: list[dict], model_name: str | None = None
+        self, messages: List[dict], model_name: Optional[str] = None
     ) -> str:
         """Internal helper for multi-turn conversation using a history list."""
 
@@ -231,7 +397,7 @@ class Conversation:
             {"role": "system", "content": system_prompt}
         ]
 
-    def send(self, user_prompt: str, model_name: str | None = None) -> str:
+    def send(self, user_prompt: str, model_name: Optional[str] = None) -> str:
         """Append a user message, get the assistant reply and store it."""
 
         self.messages.append({"role": "user", "content": user_prompt})
@@ -250,7 +416,7 @@ def askgpt(
     system_prompt: str,
     user_prompt: str,
     model_name: str,
-    image_path: str | None = None,
+    image_path: Optional[str] = None,
 ) -> str:
     """Backward compatible helper calling :class:`LLM`."""
 
@@ -292,7 +458,6 @@ def mixed_decode(text: str) -> str:
     # Combine the normal text with the decoded byte sequence
     final_text = normal_text + ": " + decoded_text
     return final_text
-
 
 
 if __name__ == "__main__":

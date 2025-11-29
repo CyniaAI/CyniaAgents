@@ -1081,3 +1081,134 @@ def format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / 1024:.1f} KB"
     else:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+class FolderImportUI:
+    """UI component for importing components from a local folder."""
+    
+    def __init__(self, component_manager: ComponentManager):
+        self.component_manager = component_manager
+        self._import_progress = {}
+        self._import_logs = {}
+    
+    def render_folder_import_interface(self) -> None:
+        """Render the folder import interface."""
+        st.subheader("📁 Import Component from Folder")
+        
+        # Folder path input
+        folder_path = st.text_input(
+            "Enter the absolute path to the component folder",
+            help="The folder should contain the component code (e.g., main.py or __init__.py)"
+        )
+        
+        if folder_path:
+            self._handle_folder_path(folder_path)
+        
+        # Show import progress if active
+        if self._import_progress:
+            self._render_import_progress()
+        
+        # Show import logs
+        if self._import_logs:
+            self._render_import_logs()
+            
+    def _handle_folder_path(self, folder_path: str) -> None:
+        """Handle folder path validation and import."""
+        if not os.path.exists(folder_path):
+            st.error("❌ Path does not exist.")
+            return
+            
+        if not os.path.isdir(folder_path):
+            st.error("❌ Path is not a directory.")
+            return
+            
+        st.success("✅ Valid directory found!")
+        
+        # Show contents preview
+        try:
+            files = os.listdir(folder_path)
+            st.markdown("**Folder Contents:**")
+            for f in files[:5]: # Show first 5 files
+                icon = "📁" if os.path.isdir(os.path.join(folder_path, f)) else "📄"
+                st.write(f"{icon} `{f}`")
+            if len(files) > 5:
+                st.write(f"... and {len(files) - 5} more files")
+        except Exception as e:
+            st.error(f"Error reading directory: {e}")
+            
+        # Import button
+        if st.button("🚀 Import Component", key="btn_import_folder", type="primary"):
+            self._start_folder_import(folder_path)
+
+    def _start_folder_import(self, folder_path: str) -> None:
+        """Start folder import process."""
+        import_id = f"import_folder_{int(time.time())}"
+        self._import_progress[import_id] = {
+            'path': folder_path,
+            'progress': 0,
+            'status': 'Starting import...',
+        }
+        self._import_logs[import_id] = []
+        
+        def import_worker():
+            try:
+                self._update_import_progress(import_id, 10, "Copying files...")
+                
+                result = self.component_manager.import_component_from_folder(folder_path)
+                
+                if result.success:
+                    self._update_import_progress(import_id, 100, "Import completed!")
+                    self._add_import_log(import_id, f"✅ Successfully imported component: {result.component_name}")
+                    # Trigger UI refresh via session state or rerun if possible, 
+                    # but since we are in a thread, we rely on the user refreshing or the next interaction.
+                    # Actually, we can't easily rerun from a thread in Streamlit without extra hacks.
+                    # But the progress bar will update if we poll or if the user interacts.
+                    # For now, we just update state.
+                else:
+                    self._update_import_progress(import_id, 0, f"Import failed: {result.error_message}")
+                    self._add_import_log(import_id, f"❌ Import failed: {result.error_message}")
+                    
+            except Exception as e:
+                self._update_import_progress(import_id, 0, f"Import error: {str(e)}")
+                self._add_import_log(import_id, f"❌ Error: {str(e)}")
+            
+            finally:
+                time.sleep(5)
+                if import_id in self._import_progress:
+                    del self._import_progress[import_id]
+        
+        thread = threading.Thread(target=import_worker, daemon=True)
+        thread.start()
+        
+        # We can't rerun from here immediately because the thread just started.
+        # But we can show a message.
+        st.info("Import started in background...")
+        time.sleep(0.5)
+        st.rerun()
+
+    def _render_import_progress(self) -> None:
+        """Render import progress indicators."""
+        st.markdown("#### Import Progress")
+        for import_id, progress_info in self._import_progress.items():
+            st.write(f"**Importing from: {progress_info['path']}**")
+            st.progress(progress_info['progress'] / 100.0)
+            st.info(f"🔄 {progress_info['status']}")
+
+    def _render_import_logs(self) -> None:
+        """Render import logs."""
+        if not self._import_logs:
+            return
+        with st.expander("📋 Import Logs", expanded=True):
+            for import_id, logs in self._import_logs.items():
+                for log in logs:
+                    st.text(log)
+
+    def _update_import_progress(self, import_id: str, progress: int, status: str) -> None:
+        if import_id in self._import_progress:
+            self._import_progress[import_id]['progress'] = progress
+            self._import_progress[import_id]['status'] = status
+
+    def _add_import_log(self, import_id: str, message: str) -> None:
+        if import_id not in self._import_logs:
+            self._import_logs[import_id] = []
+        self._import_logs[import_id].append(message)

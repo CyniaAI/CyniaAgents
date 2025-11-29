@@ -1,3 +1,34 @@
+Metadata-Version: 2.4
+Name: cynia-agents
+Version: 2.0.0
+Summary: A lightweight framework for running generative agents through a Streamlit interface.
+Author: CyniaAgents Team
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: streamlit
+Requires-Dist: watchdog
+Requires-Dist: python-dotenv
+Requires-Dist: chardet
+Requires-Dist: requests
+Requires-Dist: psutil
+Requires-Dist: packaging
+Requires-Dist: langchain
+Requires-Dist: langchain-openai
+Requires-Dist: langchain-google-genai
+Requires-Dist: langchain-anthropic
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 ![Demo](public/demo.png)
 
 # Cynia Agents
