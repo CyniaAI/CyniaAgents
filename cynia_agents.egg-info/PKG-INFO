@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: cynia-agents
-Version: 2.0.0
+Version: 2.1.0
 Summary: A lightweight framework for running generative agents through a Streamlit interface.
 Author: CyniaAgents Team
 Classifier: Programming Language :: Python :: 3
@@ -84,7 +84,7 @@ See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for detailed informatio
 A component is a Python module placed inside the `components/` directory. Here's a minimal example of a CyniaAgents component.
 
 ```python
-from component_base import BaseComponent
+from cynia_agents.component_base import BaseComponent
 
 class MyComponent(BaseComponent):
     name = "My Generator"

@@ -53,7 +53,7 @@ See [COMPONENT_DEVELOPMENT.md](COMPONENT_DEVELOPMENT.md) for detailed informatio
 A component is a Python module placed inside the `components/` directory. Here's a minimal example of a CyniaAgents component.
 
 ```python
-from component_base import BaseComponent
+from cynia_agents.component_base import BaseComponent
 
 class MyComponent(BaseComponent):
     name = "My Generator"

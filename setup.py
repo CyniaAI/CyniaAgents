@@ -2,21 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name="cynia-agents",
-    version="2.0.0",
+    version="2.1.0",
     packages=find_packages(),
-    py_modules=[
-        "cynia_cli",
-        "web",
-        "config",
-        "utils",
-        "component_manager",
-        "artifact_manager",
-        "ui_components",
-        "component_base",
-        "log_writer",
-        "version_checker",
-        "component_load_guard",
-    ],
     include_package_data=True,
     install_requires=[
         "streamlit",
@@ -33,7 +20,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "cynia-agents=cynia_cli:main",
+            "cynia-agents=cynia_agents.cynia_cli:main",
         ],
     },
     author="CyniaAgents Team",

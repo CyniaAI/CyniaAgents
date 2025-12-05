@@ -5,6 +5,4 @@ include banner.jpeg
 include prompts.json
 include components.json
 recursive-include public *
-recursive-include components *
-recursive-include hot_reload *
-recursive-include lib *
+recursive-include cynia_agents *

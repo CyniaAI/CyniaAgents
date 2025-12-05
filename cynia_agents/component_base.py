@@ -1,4 +1,4 @@
-from log_writer import logger as default_logger
+from .log_writer import logger as default_logger
 
 
 class BaseComponent:

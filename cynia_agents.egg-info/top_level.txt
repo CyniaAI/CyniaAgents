@@ -1,14 +1,2 @@
-artifact_manager
-component_base
-component_load_guard
-component_manager
-components
-config
-cynia_cli
-hot_reload
-log_writer
+cynia_agents
 tests
-ui_components
-utils
-version_checker
-web

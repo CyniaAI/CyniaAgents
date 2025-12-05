@@ -1,2 +1,2 @@
 [console_scripts]
-cynia-agents = cynia_cli:main
+cynia-agents = cynia_agents.cynia_cli:main

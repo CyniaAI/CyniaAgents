@@ -2,6 +2,7 @@ __pycache__
 /temp
 /build
 /logs
+/cynia_agents/logs
 test.py
 _config.yaml
 /generated
@@ -11,6 +12,9 @@ test.txt
 /test
 /.vscode
 /.kiro
+/.tmp
+/.agent
+/temp_uploads
 
 .env
 conponents.json

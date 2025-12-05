@@ -10,16 +10,16 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pathlib import Path
 
-from log_writer import logger
+from .log_writer import logger
 
-from component_base import BaseComponent, PlaceholderComponent
-from hot_reload.hot_reload_manager import HotReloadManager
-from hot_reload.dependency import DependencyManager
-from hot_reload.loader import ComponentLoader
-from hot_reload.models import ComponentStatus, ComponentMetadata, ReloadResult, InstallationResult
-from component_load_guard import start_loading_component, finish_loading_component, can_load_component, is_component_loading
-from version_checker import VersionChecker
-import config
+from .component_base import BaseComponent, PlaceholderComponent
+from .hot_reload.hot_reload_manager import HotReloadManager
+from .hot_reload.dependency import DependencyManager
+from .hot_reload.loader import ComponentLoader
+from .hot_reload.models import ComponentStatus, ComponentMetadata, ReloadResult, InstallationResult
+from .component_load_guard import start_loading_component, finish_loading_component, can_load_component, is_component_loading
+from .version_checker import VersionChecker
+from . import config
 
 
 class ComponentManager:
@@ -31,7 +31,15 @@ class ComponentManager:
         else:
             self.components_dir = components_dir
             
+            self.components_dir = components_dir
+            
+        # Resolve config_path (components.json)
         self.config_path = config_path
+        if not os.path.isabs(config_path) and not os.path.exists(config_path):
+            # Check package directory
+            pkg_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), config_path)
+            if os.path.exists(pkg_config):
+                self.config_path = pkg_config
         self.available = {}
         self.enabled = []
         

@@ -1,7 +1,7 @@
-from component_base import BaseComponent
+from cynia_agents.component_base import BaseComponent
 import streamlit as st
-import utils
-import artifact_manager
+from cynia_agents import utils
+from cynia_agents import artifact_manager
 import tempfile
 import os
 

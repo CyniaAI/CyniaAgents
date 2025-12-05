@@ -4,7 +4,7 @@ Version compatibility checker for components.
 import re
 from typing import Optional, Set, Union
 from packaging import version
-from log_writer import logger
+from .log_writer import logger
 
 
 class VersionRange:

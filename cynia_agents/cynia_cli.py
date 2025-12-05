@@ -23,8 +23,14 @@ def run_app():
          cmd.extend(sys.argv[1:])
 
     print(f"Starting Cynia Agents from {package_dir}...")
+    
+    # Add parent directory to PYTHONPATH to ensure cynia_agents package is resolvable
+    env = os.environ.copy()
+    parent_dir = os.path.dirname(package_dir)
+    env["PYTHONPATH"] = parent_dir + os.pathsep + env.get("PYTHONPATH", "")
+    
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, env=env)
     except KeyboardInterrupt:
         print("\nStopping Cynia Agents...")
 

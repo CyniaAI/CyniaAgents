@@ -22,11 +22,11 @@ import io
 import zipfile
 import os
 
-from hot_reload.models import (
+from .hot_reload.models import (
     ComponentStatus, DependencyStatus, InstallationResult, 
     ReloadResult, ComponentMetadata, DependencyInfo
 )
-from component_manager import ComponentManager
+from .component_manager import ComponentManager
 
 
 class DependencyInstallationUI:
@@ -597,8 +597,8 @@ class ComponentManagementUI:
                 # Framework version compatibility
                 supported_versions = getattr(component, 'supported_framework_versions', None)
                 if supported_versions is not None:
-                    from version_checker import VersionChecker
-                    import config
+                    from .version_checker import VersionChecker
+                    from . import config
                     framework_version = getattr(config, 'VERSION_NUMBER', '1.0.0')
                     is_compatible = VersionChecker.is_version_supported(supported_versions, framework_version)
                     

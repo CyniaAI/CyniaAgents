@@ -11,8 +11,8 @@ import base64
 import mimetypes
 import requests
 
-from log_writer import logger
-import config
+from .log_writer import logger
+from . import config
 
 
 def _create_client(provider: str, api_key: str, base_url: str, model_name: str):

@@ -500,13 +500,13 @@ class ComponentLoader:
                     return None
                 
                 spec = importlib.util.spec_from_file_location(
-                    f"components.{component_name}",
+                    f"cynia_agents.components.{component_name}",
                     str(main_file)
                 )
             else:
                 # Load single file
                 spec = importlib.util.spec_from_file_location(
-                    f"components.{component_name}",
+                    f"cynia_agents.components.{component_name}",
                     str(component_path)
                 )
             

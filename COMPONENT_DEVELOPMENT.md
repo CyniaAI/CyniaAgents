@@ -3,7 +3,7 @@
 A component is a Python module placed inside the `components/` directory.  Each component must expose a `get_component()` function returning an object derived from `BaseComponent`.
 
 ```python
-from component_base import BaseComponent
+from cynia_agents.component_base import BaseComponent
 
 class MyComponent(BaseComponent):
     name = "My Generator"

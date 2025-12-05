@@ -2,7 +2,7 @@ import os
 import json
 import shutil
 from dotenv import load_dotenv
-from log_writer import logger
+from .log_writer import logger
 
 # Built-in registry of configuration items.
 # Each entry maps the key name to a dictionary containing a description and UI
@@ -69,7 +69,12 @@ def load_config():
         )
       # Load prompts from prompts.json file
     try:
-        with open('prompts.json', 'r', encoding='utf-8') as f:
+        # Try CWD first, then package directory
+        prompts_file = 'prompts.json'
+        if not os.path.exists(prompts_file):
+            prompts_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prompts.json')
+            
+        with open(prompts_file, 'r', encoding='utf-8') as f:
             prompts = json.load(f)
             
         # Configuration keys that should be loaded from prompts.json

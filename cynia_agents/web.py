@@ -1,11 +1,14 @@
 import streamlit as st
 import os
 
-import config
-import utils
-from component_manager import ComponentManager
-import artifact_manager
-from ui_components import DependencyInstallationUI, ZipImportUI, ComponentManagementUI, RealTimeStatusUI, FolderImportUI
+import streamlit as st
+import os
+
+from cynia_agents import config
+from cynia_agents import utils
+from cynia_agents.component_manager import ComponentManager
+from cynia_agents import artifact_manager
+from cynia_agents.ui_components import DependencyInstallationUI, ZipImportUI, ComponentManagementUI, RealTimeStatusUI, FolderImportUI
 
 
 utils.initialize()
