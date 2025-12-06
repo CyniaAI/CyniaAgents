@@ -82,7 +82,7 @@ class MyComponent(BaseComponent):
 Components can expose custom configuration values which are stored in the project's `.env` file. Use `config.register_config_item()` to define a new key, description and input type:
 
 ```python
-import config
+from cynia_agents import config
 
 config.register_config_item(
     "MY_SETTING",
@@ -100,7 +100,7 @@ When using ``input_type='select'`` pass an ``options`` list to define the dropdo
 Use the :class:`LLM` helper from ``utils`` for any language model requests:
 
 ```python
-from utils import LLM
+from cynia_agents.utils import LLM
 
 llm = LLM()
 response = llm.ask(
@@ -222,7 +222,7 @@ Components may generate output files that users can download from the
 and then call `write_artifact()` to store it:
 
 ```python
-import artifact_manager
+from cynia_agents import artifact_manager
 
 artifact_manager.register_artifact_type("text")
 
